@@ -4,83 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Raj Patel - Personal Website</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 0;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #333;
-            line-height: 1.6;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
-        }
-        header {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            padding: 2em 0;
-            text-align: center;
-            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
-            margin-bottom: 2em;
-        }
-        header h1 {
-            margin: 0;
-            font-size: 3em;
-            color: #2c3e50;
-        }
-        .contact-info {
-            margin-top: 1em;
-            font-size: 1.2em;
-            color: #7f8c8d;
-        }
-        .contact-info p {
-            margin: 0.5em 0;
-        }
-        section {
-            background: white;
-            margin-bottom: 2em;
-            padding: 2em;
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-        }
-        h2 {
-            color: #2c3e50;
-            border-bottom: 3px solid #3498db;
-            padding-bottom: 0.5em;
-            margin-bottom: 1em;
-        }
-        .projects {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2em;
-        }
-        .project {
-            border: 1px solid #ecf0f1;
-            border-radius: 8px;
-            padding: 1.5em;
-            transition: transform 0.3s, box-shadow 0.3s;
-        }
-        .project:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-        }
-        .project h3 {
-            color: #3498db;
-            margin-top: 0;
-        }
-        .project p {
-            text-align: justify;
-        }
-        footer {
-            text-align: center;
-            padding: 2em 0;
-            background: #2c3e50;
-            color: white;
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <header>
@@ -106,43 +30,59 @@
             <h2>My Projects</h2>
             <div class="projects">
                 <div class="project">
-                    <img src="https://images.unsplash.com/photo-1559757148-5c350d0d3c56?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" alt="AI Healthcare Diagnostic System" style="width:100%; height:200px; object-fit:cover; border-radius:8px; margin-bottom:1em;">
-                    <h3>Project 1: AI-Powered Healthcare Diagnostic System</h3>
+                    <a href="projects/project1.html">
+                        <img src="https://images.unsplash.com/photo-1559757148-5c350d0d3c56?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" alt="AI Healthcare Diagnostic System">
+                        <h3>Project 1: AI-Powered Healthcare Diagnostic System</h3>
+                    </a>
                     <p>This groundbreaking project represents a fusion of artificial intelligence and medical diagnostics, designed to revolutionize patient care in clinical settings. The system leverages deep learning algorithms trained on vast datasets of medical imaging, laboratory results, and patient histories to provide rapid, accurate diagnoses across multiple medical specialties. At its core, the project employs convolutional neural networks (CNNs) for image analysis, natural language processing (NLP) for interpreting clinical notes, and reinforcement learning for continuous improvement of diagnostic accuracy. The development process involved extensive collaboration with medical professionals to ensure clinical relevance and ethical implementation. We collected and anonymized data from partner hospitals, implementing rigorous privacy protocols compliant with HIPAA and GDPR standards. The machine learning pipeline includes data preprocessing, feature extraction, model training, and validation phases, with particular attention to handling imbalanced datasets common in medical scenarios. Key innovations include a multi-modal approach that integrates radiological images, blood test results, and textual patient information for comprehensive diagnostic insights. The system features an explainable AI component that provides clinicians with confidence scores and reasoning behind each diagnosis, fostering trust and facilitating human-AI collaboration. Performance metrics show diagnostic accuracy rates exceeding 95% across tested conditions, with false positive rates below 2%. Implementation challenges included managing computational complexity, ensuring real-time processing capabilities, and developing user interfaces intuitive for medical professionals. The project utilized cloud computing resources for scalable training and deployed edge computing solutions for on-site diagnostics in resource-constrained environments. Future developments include expanding to telemedicine applications and integrating with electronic health record systems for seamless workflow integration. The impact of this project extends beyond individual patient outcomes, potentially reducing diagnostic errors, optimizing resource allocation in healthcare systems, and democratizing access to expert-level medical analysis in underserved regions. Ongoing research focuses on expanding the system's capabilities to rare diseases and personalized treatment recommendations based on genetic profiles.</p>
                 </div>
                 <div class="project">
-                    <img src="https://images.unsplash.com/photo-1639762681485-074b7f938ba0?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" alt="Decentralized Social Media Platform" style="width:100%; height:200px; object-fit:cover; border-radius:8px; margin-bottom:1em;">
-                    <h3>Project 2: Decentralized Social Media Platform</h3>
+                    <a href="projects/project2.html">
+                        <img src="https://images.unsplash.com/photo-1639762681485-074b7f938ba0?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" alt="Decentralized Social Media Platform">
+                        <h3>Project 2: Decentralized Social Media Platform</h3>
+                    </a>
                     <p>In an era of growing concerns about data privacy and platform monopolies, this project introduces a revolutionary decentralized social media ecosystem built on blockchain technology. The platform empowers users with true ownership of their data and content, eliminating the centralized control that characterizes traditional social networks. By leveraging distributed ledger technology, we create a censorship-resistant environment where users can share ideas, connect with communities, and monetize their digital presence without intermediary oversight. The architecture combines InterPlanetary File System (IPFS) for content storage with Ethereum-compatible smart contracts for governance and token economics. Users create decentralized identities using self-sovereign identity protocols, allowing them to maintain consistent personas across the platform while retaining full control over personal information. The system implements a reputation-based algorithm that rewards quality content and community engagement, fostering a healthier online discourse compared to engagement-driven models of traditional platforms. Smart contracts govern content moderation through community voting mechanisms, ensuring democratic decision-making while preventing abuse. The platform's native cryptocurrency facilitates microtransactions for content creators, tipping systems, and governance participation. Advanced encryption techniques protect user communications, and zero-knowledge proofs enable privacy-preserving social features like anonymous posting and selective disclosure of personal information. Development focused on creating an intuitive user experience that abstracts the complexity of blockchain interactions, making decentralized technology accessible to mainstream users. The frontend utilizes modern web technologies with progressive web app capabilities for offline functionality. Backend services handle content indexing, search optimization, and real-time notifications through a hybrid centralized-decentralized approach for performance. Challenges addressed include scalability limitations of current blockchain networks, user adoption barriers, and regulatory compliance in various jurisdictions. The project includes educational resources and onboarding flows to help users transition from traditional platforms. Pilot deployments in niche communities have demonstrated strong engagement metrics, with user retention rates 40% higher than comparable centralized alternatives. Future roadmap includes integration with Web3 ecosystems, NFT marketplaces for digital art and collectibles, and decentralized autonomous organizations (DAOs) for platform governance. The project aims to contribute to a more equitable digital economy by redistributing value from platform owners to content creators and users.</p>
                 </div>
                 <div class="project">
-                    <img src="https://images.unsplash.com/photo-1473968512647-3e447244af8f?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" alt="Autonomous Drone Swarm Coordination" style="width:100%; height:200px; object-fit:cover; border-radius:8px; margin-bottom:1em;">
-                    <h3>Project 3: Autonomous Drone Swarm Coordination</h3>
+                    <a href="projects/project3.html">
+                        <img src="https://images.unsplash.com/photo-1473968512647-3e447244af8f?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" alt="Autonomous Drone Swarm Coordination">
+                        <h3>Project 3: Autonomous Drone Swarm Coordination</h3>
+                    </a>
                     <p>This ambitious project explores the frontiers of multi-agent systems through the development of an autonomous drone swarm capable of complex coordinated behaviors. Inspired by natural phenomena like bird flocks and ant colonies, the system demonstrates emergent intelligence from simple individual rules, enabling applications in search and rescue, environmental monitoring, and agricultural optimization. The project combines advanced robotics, distributed computing, and artificial intelligence to create a scalable framework for swarm coordination. At the hardware level, each drone is equipped with high-precision GPS, inertial measurement units, and computer vision systems for environmental perception. The software architecture implements a hierarchical control system with local decision-making at the individual drone level and global coordination through distributed consensus algorithms. Machine learning techniques optimize swarm behaviors for specific tasks, adapting to dynamic environments and mission requirements. Key algorithms include flocking models for maintaining formation, task allocation protocols for distributing work among swarm members, and collision avoidance systems using predictive modeling. The system incorporates reinforcement learning for adaptive behavior modification, allowing swarms to learn optimal strategies through experience. Communication protocols ensure reliable data exchange between drones, with mesh networking capabilities for maintaining connectivity in challenging environments. Field testing demonstrated impressive capabilities in applications such as wildfire monitoring, where swarms can cover vast areas efficiently, and precision agriculture, where coordinated drones optimize crop spraying patterns. The project addresses critical challenges in energy management, with algorithms for dynamic battery life optimization and emergency landing protocols. Safety features include geo-fencing, fail-safe mechanisms, and human override capabilities. The development process involved extensive simulation environments for testing swarm behaviors before real-world deployment. Computer vision algorithms enable drones to recognize objects, track moving targets, and navigate complex terrain. Integration with ground stations provides real-time monitoring and mission planning capabilities, with APIs for third-party application development. Future developments include expanding swarm sizes to hundreds of units, incorporating heterogeneous drone types for specialized tasks, and exploring applications in urban air mobility. The project contributes to the broader field of autonomous systems, with potential implications for disaster response, infrastructure inspection, and environmental conservation efforts.</p>
                 </div>
                 <div class="project">
-                    <img src="https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" alt="Quantum Computing Simulation Framework" style="width:100%; height:200px; object-fit:cover; border-radius:8px; margin-bottom:1em;">
-                    <h3>Project 4: Quantum Computing Simulation Framework</h3>
+                    <a href="projects/project4.html">
+                        <img src="https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" alt="Quantum Computing Simulation Framework">
+                        <h3>Project 4: Quantum Computing Simulation Framework</h3>
+                    </a>
                     <p>This comprehensive framework brings quantum computing capabilities to classical computers, enabling researchers and developers to experiment with quantum algorithms without access to expensive quantum hardware. The project addresses the growing need for quantum software development tools as the field transitions from theoretical research to practical applications. By providing a high-fidelity simulation environment, the framework accelerates quantum algorithm development and education. The core of the system is a highly optimized quantum state simulator that accurately models qubit interactions, quantum gates, and measurement operations. The framework supports various quantum computing models, including circuit-based, adiabatic, and topological approaches. Advanced noise modeling capabilities simulate real-world quantum device imperfections, allowing developers to test error correction algorithms and fault-tolerant quantum computing techniques. Built with performance in mind, the simulator leverages GPU acceleration and distributed computing for handling large quantum systems. The API provides intuitive interfaces for quantum circuit construction, with support for popular quantum programming languages and integration with classical computing workflows. Visualization tools help users understand quantum state evolution and algorithm behavior through interactive 3D representations and real-time plotting. Educational components include interactive tutorials, quantum algorithm libraries, and a playground environment for experimentation. The framework supports hybrid quantum-classical algorithms, enabling exploration of near-term quantum applications like quantum machine learning and optimization problems. Benchmarking tools compare simulation performance across different hardware configurations and provide insights for algorithm optimization. The project includes a comprehensive test suite covering quantum mechanics principles, algorithm correctness, and performance benchmarks. Documentation and community resources foster collaboration among quantum researchers, with contributions from leading academic institutions and industry partners. The framework's modular architecture allows for easy extension to new quantum computing paradigms and hardware backends. Applications span quantum chemistry simulations, financial modeling, cryptography research, and machine learning algorithm development. The framework has been adopted by universities for quantum computing courses and by companies exploring quantum solutions for complex optimization problems. Future enhancements include cloud-based simulation services and integration with actual quantum hardware for hybrid computing workflows.</p>
                 </div>
                 <div class="project">
-                    <img src="https://images.unsplash.com/photo-1449824913935-59a10b8d2000?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" alt="Sustainable Smart City Infrastructure" style="width:100%; height:200px; object-fit:cover; border-radius:8px; margin-bottom:1em;">
-                    <h3>Project 5: Sustainable Smart City Infrastructure</h3>
+                    <a href="projects/project5.html">
+                        <img src="https://images.unsplash.com/photo-1449824913935-59a10b8d2000?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" alt="Sustainable Smart City Infrastructure">
+                        <h3>Project 5: Sustainable Smart City Infrastructure</h3>
+                    </a>
                     <p>This visionary project reimagines urban infrastructure through the integration of IoT sensors, AI-driven analytics, and sustainable design principles to create more livable, efficient, and environmentally friendly cities. The comprehensive platform addresses critical challenges in urban planning, resource management, and citizen well-being by leveraging data-driven insights and predictive modeling. The initiative combines hardware deployment, software development, and policy recommendations to transform traditional cities into intelligent, adaptive ecosystems. The infrastructure network comprises thousands of sensors monitoring air quality, traffic patterns, energy consumption, and environmental conditions throughout the city. Machine learning algorithms analyze this data in real-time to optimize traffic flow, reduce energy waste, and predict maintenance needs. The system includes smart lighting that adjusts based on pedestrian presence, adaptive traffic signals that respond to real-time conditions, and water management systems that detect leaks and optimize distribution. Citizen engagement features include mobile applications for reporting issues, participating in community decision-making, and accessing personalized sustainability recommendations. The platform incorporates blockchain technology for transparent governance and secure data sharing between city departments. Advanced analytics provide city planners with predictive insights for infrastructure development and emergency response planning. Sustainability metrics track carbon footprint reduction, energy efficiency improvements, and waste management optimization. The project includes educational programs to raise citizen awareness about environmental impact and encourages behavioral changes through gamification and incentives. Integration with renewable energy sources and electric vehicle infrastructure supports the transition to a low-carbon urban environment. Privacy-preserving techniques ensure citizen data protection while enabling valuable insights. The scalable architecture supports deployment across cities of varying sizes, with modular components that can be customized for local needs. Pilot implementations have demonstrated significant improvements in air quality monitoring, traffic congestion reduction, and energy conservation. The project collaborates with urban planners, environmental scientists, and technology experts to create holistic solutions. Future developments include expanding to inter-city networks, incorporating autonomous vehicle coordination, and developing standardized protocols for smart city data exchange. The initiative aims to serve as a blueprint for sustainable urban development worldwide.</p>
                 </div>
                 <div class="project">
-                    <img src="https://images.unsplash.com/photo-1555949963-aa79dcee981c?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" alt="Neural Language Processing for Code Generation" style="width:100%; height:200px; object-fit:cover; border-radius:8px; margin-bottom:1em;">
-                    <h3>Project 6: Neural Language Processing for Code Generation</h3>
+                    <a href="projects/project6.html">
+                        <img src="https://images.unsplash.com/photo-1555949963-aa79dcee981c?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" alt="Neural Language Processing for Code Generation">
+                        <h3>Project 6: Neural Language Processing for Code Generation</h3>
+                    </a>
                     <p>This cutting-edge project harnesses the power of large language models and transformer architectures to revolutionize software development through automated code generation. The system learns from vast codebases across multiple programming languages, enabling developers to generate high-quality code snippets, complete functions, and even entire applications from natural language descriptions. The project addresses the growing demand for efficient software development tools in an era of increasing complexity and time constraints. The core technology employs advanced transformer models trained on curated datasets of open-source code, documentation, and programming best practices. The system understands context, programming paradigms, and domain-specific requirements to generate code that adheres to established conventions and security standards. Multi-modal capabilities integrate code generation with visual programming interfaces and collaborative editing features. Key features include intelligent code completion that goes beyond simple autocompletion to suggest entire code blocks, automatic refactoring tools that improve code quality and performance, and debugging assistants that identify potential issues before runtime. The system supports multiple programming languages and frameworks, with specialized models for web development, data science, and systems programming. Ethical considerations are paramount, with built-in safeguards against generating malicious code and mechanisms for detecting AI-generated content. The platform includes educational tools that help developers understand generated code and learn programming concepts. Integration with popular IDEs and version control systems ensures seamless workflow integration. Performance optimizations include model distillation techniques for faster inference and edge deployment capabilities for offline code generation. The system continuously learns from user feedback and code quality metrics to improve generation accuracy over time. Extensive testing ensures generated code meets industry standards for reliability and maintainability. Applications extend to automated testing, documentation generation, and legacy code modernization. The project has been adopted by development teams for rapid prototyping and has shown significant productivity improvements in software development workflows. Future research focuses on multi-agent code generation systems and integration with formal verification tools for critical systems development.</p>
                 </div>
                 <div class="project">
-                    <img src="https://images.unsplash.com/photo-1592478411213-6153e4ebc696?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" alt="Augmented Reality Educational Platform" style="width:100%; height:200px; object-fit:cover; border-radius:8px; margin-bottom:1em;">
-                    <h3>Project 7: Augmented Reality Educational Platform</h3>
+                    <a href="projects/project7.html">
+                        <img src="https://images.unsplash.com/photo-1592478411213-6153e4ebc696?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" alt="Augmented Reality Educational Platform">
+                        <h3>Project 7: Augmented Reality Educational Platform</h3>
+                    </a>
                     <p>This immersive educational platform transforms learning experiences through augmented reality technology, creating interactive 3D environments that bring abstract concepts to life. The project combines computer vision, spatial computing, and pedagogical research to develop engaging educational content across STEM subjects. By overlaying digital information on the physical world, the platform enables students to explore complex topics through hands-on, experiential learning. The system utilizes mobile devices and AR glasses to deliver interactive lessons in subjects ranging from molecular biology to astrophysics. Students can manipulate virtual objects, conduct virtual experiments, and visualize data in three-dimensional space. The platform's adaptive learning algorithms personalize content based on student progress and learning styles, ensuring optimal educational outcomes. Content creation tools empower educators to design custom AR experiences without extensive programming knowledge. The platform includes collaborative features for group learning and remote classrooms. Advanced tracking systems monitor student engagement and comprehension, providing teachers with detailed analytics for instructional improvement. Accessibility features ensure the platform serves diverse learners, including those with visual or motor impairments. The system incorporates gamification elements to maintain student motivation and includes social learning components that foster peer interaction. Integration with existing curriculum standards ensures alignment with educational requirements. Technical innovations include real-time physics simulations, accurate 3D modeling, and low-latency rendering for smooth user experiences. The platform supports offline functionality for areas with limited connectivity and includes parental controls for younger users. Extensive user testing with educational institutions has demonstrated improved learning outcomes and increased student engagement. The project explores applications in vocational training, medical education, and professional development. Future developments include expanding to virtual reality for fully immersive experiences and incorporating AI tutors for personalized guidance. The platform aims to democratize access to high-quality education through affordable AR technology.</p>
                 </div>
                 <div class="project">
-                    <img src="https://images.unsplash.com/photo-1563013544-824ae1b704d3?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" alt="Blockchain-Based Supply Chain Transparency" style="width:100%; height:200px; object-fit:cover; border-radius:8px; margin-bottom:1em;">
-                    <h3>Project 8: Blockchain-Based Supply Chain Transparency</h3>
+                    <a href="projects/project8.html">
+                        <img src="https://images.unsplash.com/photo-1563013544-824ae1b704d3?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" alt="Blockchain-Based Supply Chain Transparency">
+                        <h3>Project 8: Blockchain-Based Supply Chain Transparency</h3>
+                    </a>
                     <p>This transformative project leverages blockchain technology to create unprecedented transparency and traceability in global supply chains, addressing critical issues of authenticity, sustainability, and ethical sourcing. The platform enables consumers and businesses to track products from raw materials to end-user, verifying claims about origin, manufacturing processes, and environmental impact. By creating an immutable ledger of supply chain events, the system combats counterfeiting, ensures regulatory compliance, and promotes sustainable business practices. The architecture combines public and private blockchain networks with IoT sensors and RFID technology for real-time tracking. Smart contracts automate compliance checks, payment processing, and quality assurance protocols. The system integrates with existing enterprise resource planning (ERP) systems, providing seamless adoption for businesses of all sizes. Key features include product passports that contain comprehensive lifecycle information, carbon footprint tracking, and labor condition monitoring. Consumers access this information through mobile applications with QR code scanning capabilities. Advanced analytics provide supply chain managers with predictive insights for optimization and risk mitigation. The platform addresses privacy concerns through selective disclosure mechanisms and zero-knowledge proofs. Interoperability standards ensure compatibility across different blockchain networks and traditional systems. The project includes certification programs for suppliers and educational resources for industry adoption. Pilot implementations in food, pharmaceuticals, and luxury goods sectors have demonstrated significant improvements in traceability and consumer trust. The system reduces fraud by 90% in tested scenarios and provides valuable data for sustainability reporting. Scalability solutions include layer-2 protocols and sharding techniques for handling high transaction volumes. Future developments include integration with Internet of Things (IoT) devices for automated data collection and expansion to circular economy applications. The project contributes to global sustainability goals by enabling informed consumer choices and promoting ethical business practices across industries.</p>
                 </div>
             </div>
