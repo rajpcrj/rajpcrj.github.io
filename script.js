@@ -2,6 +2,9 @@
 fetch('personal.json')
   .then(response => response.json())
   .then(data => {
+    // Set page title
+    document.title = `${data.name} - Personal Website`;
+
     // Update name
     const nameElements = document.querySelectorAll('.personal-name');
     nameElements.forEach(el => el.textContent = data.name);
