@@ -3,17 +3,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Project 1: AI-Powered Healthcare Diagnostic System</title>
+    <title>Project 1: Home Safety System – Fall Detection & Smart Stove Control</title>
     <link rel="stylesheet" href="../style.css">
 </head>
 <body>
     <header>
-        <h1>Project 1: AI-Powered Healthcare Diagnostic System</h1>
+        <h1>Project 1: Home Safety System – Fall Detection &amp; Smart Stove Control</h1>
     </header>
     <main>
         <section>
-            <img src="https://images.unsplash.com/photo-1559757148-5c350d0d3c56?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" alt="AI Healthcare Diagnostic System" style="width:100%; height:200px; object-fit:cover; border-radius:8px; margin-bottom:1em;">
-            <p>This groundbreaking project represents a fusion of artificial intelligence and medical diagnostics, designed to revolutionize patient care in clinical settings. The system leverages deep learning algorithms trained on vast datasets of medical imaging, laboratory results, and patient histories to provide rapid, accurate diagnoses across multiple medical specialties. At its core, the project employs convolutional neural networks (CNNs) for image analysis, natural language processing (NLP) for interpreting clinical notes, and reinforcement learning for continuous improvement of diagnostic accuracy. The development process involved extensive collaboration with medical professionals to ensure clinical relevance and ethical implementation. We collected and anonymized data from partner hospitals, implementing rigorous privacy protocols compliant with HIPAA and GDPR standards. The machine learning pipeline includes data preprocessing, feature extraction, model training, and validation phases, with particular attention to handling imbalanced datasets common in medical scenarios. Key innovations include a multi-modal approach that integrates radiological images, blood test results, and textual patient information for comprehensive diagnostic insights. The system features an explainable AI component that provides clinicians with confidence scores and reasoning behind each diagnosis, fostering trust and facilitating human-AI collaboration. Performance metrics show diagnostic accuracy rates exceeding 95% across tested conditions, with false positive rates below 2%. Implementation challenges included managing computational complexity, ensuring real-time processing capabilities, and developing user interfaces intuitive for medical professionals. The project utilized cloud computing resources for scalable training and deployed edge computing solutions for on-site diagnostics in resource-constrained environments. Future developments include expanding to telemedicine applications and integrating with electronic health record systems for seamless workflow integration. The impact of this project extends beyond individual patient outcomes, potentially reducing diagnostic errors, optimizing resource allocation in healthcare systems, and democratizing access to expert-level medical analysis in underserved regions. Ongoing research focuses on expanding the system's capabilities to rare diseases and personalized treatment recommendations based on genetic profiles.</p>
+            <p><strong>Team:</strong> Raj Priyadarshi, Zihao Hu, Morgan Waddington | Mechatronics Final Project</p>
+
+            <h2>Overview</h2>
+            <p>This project addresses a critical safety gap for elderly individuals living alone. Falls are one of the leading causes of injury in this population, and an unattended electric stove during such an incident can turn a medical emergency into a life-threatening one. The Home Safety System is a wearable prototype that detects falls in real time, alerts emergency contacts with GPS location via SMS, and automatically shuts off the user's electric stove — all without requiring the user to do anything after a fall. The project was deeply personal, inspired by the team members' own grandparents' experiences.</p>
+
+            <h2>How It Works</h2>
+            <p>The system uses two BS2 microcontrollers working in tandem over Bluetooth. The first (portable) unit is worn in the user's pocket and continuously monitors motion via a Memsic 2125 dual-axis accelerometer. The second (stationary) unit is wired into the electric stove via a Solid State Relay (SSR).</p>
+            <p>When a fall is detected, the system initiates a 20-second countdown before taking action, giving the user time to press a soft-reset button if the fall was minor. A buzzer sounds with 10 seconds remaining as a final warning. If no cancellation is received, the portable BS2 sends a signal over Bluetooth to the user's phone, which captures GPS coordinates and automatically texts the emergency contact with the user's location and address. Simultaneously, the phone relays a command to the stationary BS2, which triggers the SSR to cut power to the stove. A green LED confirms the stove has been shut off.</p>
+            <p>A second button acts as a kill switch — pressing it immediately halts all code execution, preventing repeated false alerts in case of malfunction.</p>
+
+            <h2>Fall Detection Logic</h2>
+            <p>The accelerometer outputs pulse-width signals on its X and Y axes. At startup, calibration values (xCal, yCal) are recorded and scaled down by a factor of 10 to filter noise. During operation, the absolute deviation from these baseline values is computed continuously:</p>
+            <ul>
+                <li>xDiff = |xMove − xCal|</li>
+                <li>yDiff = |yMove − yCal|</li>
+            </ul>
+            <p>If either xDiff or yDiff exceeds the predefined motion thresholds (XLimit = YLimit = 58), the system classifies the event as a fall and triggers the alarm sequence.</p>
+
+            <h2>Key Components</h2>
+            <ul>
+                <li><strong>BS2 Microcontrollers (×2)</strong> – one portable (fall detection), one stationary (stove control).</li>
+                <li><strong>Memsic 2125 Accelerometer</strong> – digital dual-axis sensor for real-time fall detection.</li>
+                <li><strong>RN-42 Bluetooth Modules (×2)</strong> – wireless communication between the two BS2 boards and the user's phone.</li>
+                <li><strong>Solid State Relay (SSR)</strong> – safely interrupts power to the electric stove (handles up to 15A with electrical isolation).</li>
+                <li><strong>Buzzer, LEDs, Push Buttons</strong> – audible/visual user feedback and manual override controls.</li>
+                <li><strong>External Power Supply</strong> – protects the BS2 from overload (BS2 limited to 40mA per 8 pins).</li>
+            </ul>
+
+            <h2>Results</h2>
+            <p>All primary objectives were successfully demonstrated: fall detection worked accurately across a range of motions, Bluetooth communication between both microcontrollers and the phone was stable, GPS location was correctly captured and texted to the emergency contact, and the SSR reliably cut power to the stove upon receiving the shutdown signal. The team carefully rewired a portable stovetop handling up to 15 amps, approaching the high-voltage work with rigorous safety practices.</p>
+
+            <h2>Cost &amp; Scalability</h2>
+            <p>Prototype cost: ~$404 (using Parallax components). With cheaper components and a conservative 10% bulk discount for mass production, the projected cost drops to ~$96.54 — a reduction of over 75% — making the system genuinely viable as a commercial product.</p>
+
+            <h2>Advantages</h2>
+            <ul>
+                <li><strong>Modular:</strong> easily adapted to control other appliances (e.g., turning lights on after a fall).</li>
+                <li><strong>Portable &amp; wireless:</strong> works anywhere in the home or outdoors, unlike fixed room-based motion detectors.</li>
+                <li><strong>Smart home potential:</strong> the Bluetooth relay can also be used to remotely turn the stove on.</li>
+                <li><strong>Location sharing:</strong> GPS alert feature extends to other safety scenarios beyond falls.</li>
+            </ul>
+
+            <h2>Limitations &amp; Future Work</h2>
+            <ul>
+                <li>Occasional false positives from the accelerometer (mitigated by the 30-second cancel window).</li>
+                <li>Prototype is bulky — future versions would miniaturise components into a compact wearable.</li>
+                <li>High prototype cost, though mass production cost analysis shows strong affordability potential.</li>
+            </ul>
         </section>
     </main>
     <footer>
