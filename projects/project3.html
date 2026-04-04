@@ -3,17 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Project 3: Autonomous Drone Swarm Coordination</title>
+    <title>Project 3: Sprout – Autonomous Greenhouse Plant Care System</title>
     <link rel="stylesheet" href="../style.css">
 </head>
 <body>
     <header>
-        <h1>Project 3: Autonomous Drone Swarm Coordination</h1>
+        <h1>Project 3: Sprout – Autonomous Greenhouse Plant Care System</h1>
     </header>
     <main>
         <section>
-            <img src="https://images.unsplash.com/photo-1473968512647-3e447244af8f?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" alt="Autonomous Drone Swarm Coordination">
-            <p>This ambitious project explores the frontiers of multi-agent systems through the development of an autonomous drone swarm capable of complex coordinated behaviors. Inspired by natural phenomena like bird flocks and ant colonies, the system demonstrates emergent intelligence from simple individual rules, enabling applications in search and rescue, environmental monitoring, and agricultural optimization. The project combines advanced robotics, distributed computing, and artificial intelligence to create a scalable framework for swarm coordination. At the hardware level, each drone is equipped with high-precision GPS, inertial measurement units, and computer vision systems for environmental perception. The software architecture implements a hierarchical control system with local decision-making at the individual drone level and global coordination through distributed consensus algorithms. Machine learning techniques optimize swarm behaviors for specific tasks, adapting to dynamic environments and mission requirements. Key algorithms include flocking models for maintaining formation, task allocation protocols for distributing work among swarm members, and collision avoidance systems using predictive modeling. The system incorporates reinforcement learning for adaptive behavior modification, allowing swarms to learn optimal strategies through experience. Communication protocols ensure reliable data exchange between drones, with mesh networking capabilities for maintaining connectivity in challenging environments. Field testing demonstrated impressive capabilities in applications such as wildfire monitoring, where swarms can cover vast areas efficiently, and precision agriculture, where coordinated drones optimize crop spraying patterns. The project addresses critical challenges in energy management, with algorithms for dynamic battery life optimization and emergency landing protocols. Safety features include geo-fencing, fail-safe mechanisms, and human override capabilities. The development process involved extensive simulation environments for testing swarm behaviors before real-world deployment. Computer vision algorithms enable drones to recognize objects, track moving targets, and navigate complex terrain. Integration with ground stations provides real-time monitoring and mission planning capabilities, with APIs for third-party application development. Future developments include expanding swarm sizes to hundreds of units, incorporating heterogeneous drone types for specialized tasks, and exploring applications in urban air mobility. The project contributes to the broader field of autonomous systems, with potential implications for disaster response, infrastructure inspection, and environmental conservation efforts.</p>
+            <p><strong>Course:</strong> ROB-GY 6103: Advanced Mechatronics | NYU Tandon School of Engineering | May 2025 | Group 15</p>
+
+            <h2>Overview</h2>
+            <p>Sprout is an autonomous mechatronic system designed to automate the care of greenhouse plants and small gardens. Greenhouse environments require highly customised watering schedules, fertilisation routines, and continuous soil monitoring across different plant species year-round. Sprout addresses this through a multi-bot architecture driven by real-time sensor data, enabling autonomous watering, compost/fertiliser dispensing, and plant health monitoring without human intervention.</p>
+
+            <h2>System Architecture</h2>
+            <p>The system consists of a 3×2 plant matrix embedded with capacitive soil moisture sensors, two autonomous mobile bots, and a Raspberry Pi camera module. The control stack is distributed across three layers:</p>
+            <ul>
+                <li><strong>Arduino UNO</strong> – reads all analog soil moisture sensors and transmits data serially.</li>
+                <li><strong>ESP32 modules</strong> – handle path logic and inter-device communication via ESP-NOW protocol (peer-to-peer Wi-Fi without a router).</li>
+                <li><strong>Raspberry Pi</strong> – runs a Flask web server with AI integration for plant identification and health reporting.</li>
+            </ul>
+
+            <h2>Water Bot</h2>
+            <p>Each plant is equipped with a capacitive soil moisture sensor that outputs a voltage proportional to soil water content (dry soil: ~3.3V; saturated soil: ~1.03V). The Arduino reads all five sensors, converts raw ADC values to voltages using <code>values[i] = (float(raw) / 1023.0) * 3.3</code>, and sends this data to ESP-1 via serial communication. ESP-1 relays the data over ESP-NOW to ESP-2 on the water bot.</p>
+            <p>The water bot follows an IR line-following track and uses an IR proximity sensor to detect and stop at each plant. Based on the received moisture voltage, it determines how many times to actuate a solenoid valve (2 ml per dispense), dispensing between 1 and 6 times depending on dryness. Two soil profiles were characterised through gravimetric and volumetric analysis to calibrate the watering logic per soil type.</p>
+
+            <h2>NPK (Compost) Bot</h2>
+            <p>A second autonomous bot carries an NPK sensor (RS-485 Modbus RTU protocol, connected to an ESP32 via RE/DE-controlled RS-485 converter) to measure nitrogen, phosphorus, and potassium in the soil. The bot navigates the plant grid autonomously using IR line-following and IR object detection. Upon reaching each plant, a servo-controlled arm lowers the NPK sensor into the soil, takes a reading, and transmits it back to the Arduino via ESP-NOW through ESP-3 → ESP-1 → Arduino. Based on NPK readings, the servo-actuated compost flap dispenses fertiliser — twice for nutrient-poor soil, once for healthier soil — demonstrating closed-loop sensor-actuator control.</p>
+
+            <h2>Camera &amp; AI Module</h2>
+            <p>A third bot equipped with a Raspberry Pi camera captures images of plants on demand. These images are served through a Flask web server, allowing plant owners to remotely check in on plant health. An AI description feature provides users with information about the plant species and growing conditions, useful both for commercial greenhouse operators and home garden enthusiasts.</p>
+
+            <h2>Key Results</h2>
+            <ul>
+                <li>Soil moisture sensor voltages mapped to water dispense counts: 8× at 1.03V, 7× at 1.26V, 6× at 1.70V, 5× at 2.66V.</li>
+                <li>NPK readings for two soil profiles: Profile 1 (N: 150, P: 155, K: 145 mg/ml) and Profile 2 (N: 45, P: 70, K: 60 mg/ml).</li>
+                <li>Autonomous multi-bot coordination demonstrated on a physical track with no manual intervention.</li>
+                <li>Project cost: ~$136.72 (class kit components); full individual component cost: ~$387.</li>
+            </ul>
+
+            <h2>Lessons Learned</h2>
+            <ul>
+                <li>Gained hands-on experience with UART, serial, and Wi-Fi (ESP-NOW) communication protocols.</li>
+                <li>Implemented RS-485 Modbus RTU for NPK sensor integration with ESP32.</li>
+                <li>Developed soil profiles using gravimetric water content analysis to calibrate moisture-to-watering logic.</li>
+                <li>Used Flask to bridge embedded hardware with a web interface for real-time remote control.</li>
+                <li>Engineered robust multi-bot path planning and plant-counter synchronisation across independent systems.</li>
+            </ul>
         </section>
     </main>
     <footer>
