@@ -8,7 +8,6 @@
 const PERSONAL = {
   name: "Raj Priyadarshi",
   email: "rajpcrj@gmail.com",
-  phone: "+1 (646) 702 2507",
   linkedin: "https://linkedin.com/in/raj-priyadarshi-abcd",
   github: "https://github.com/rajpcrj",
   website: "https://rajpcrj.github.io",
@@ -26,7 +25,6 @@ function populatePersonal(data) {
 
   setText('.personal-name', data.name);
   setText('.personal-email', data.email);
-  setText('.personal-phone', data.phone);
   setText('.personal-bio', data.bio);
   setLink('.personal-linkedin', data.linkedin);
   setLink('.personal-github', data.github);

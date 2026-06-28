@@ -12,59 +12,314 @@
     </header>
     <main>
         <a class="back-home" href="../../index.html">← Back to portfolio</a>
+
         <section>
-            <p><strong>Systems / Robotics Infrastructure</strong> · C++17 · Python · ROS 2 · Linux shared memory</p>
+            <p><strong>Systems / Robotics Infrastructure</strong> · C++17 · Python · ROS 2 (Humble) · Linux shared memory · seqlock + futex</p>
             <p>
                 <a href="https://github.com/rajpcrj/ros2_shm_fanout" target="_blank">View Code on GitHub →</a>
             </p>
 
             <img class="project-video" src="graphs/cpu_vs_subs_1m.png" alt="CPU usage vs number of subscribers — the bridge stays near the floor while every DDS transport climbs to ~6 cores.">
 
-            <h2>The Problem</h2>
-            <p>While running a perception setup in <strong>NVIDIA Isaac Sim</strong>, a setup that should have been simple brought the machine to its knees. Multiple simulated camera feeds had to fan out to a stack of models — <strong>YOLO, GroundedDINO, Florence, and several LLM APIs</strong> — each needing every feed. The standard approach was to package each model as a ROS 2 node, subscribe to the camera topics, and let ROS 2 handle the plumbing. As it scaled up, the whole thing buckled.</p>
-            <p>The math was the problem. With <strong>N camera streams and K subscribers</strong>, every frame from every camera was serialized and copied to every consumer — so transport load scaled as <strong>N×K</strong>. Three cameras into a handful of models wasn't a handful of streams; it was a multiplying wall of redundant copies — the same megabyte frames serialized and copied over and over, 30 times a second, per camera, per subscriber.</p>
-            <p>The CPU pinned to 100%. The worst part wasn't even the dropped frames — it was that <strong>Isaac Sim itself started hanging</strong> under the load. The simulation couldn't keep real time, so its results were no longer meaningful. I wasn't measuring my models; I was measuring my transport choking. The culprit wasn't the models or the code — it was the <strong>ROS 2 transport layer underneath</strong>: serialize-and-copy, per subscriber, per frame. So I built something to bypass it entirely.</p>
+            <div class="stats">
+                <div class="stat"><span class="num">~8×</span><span class="lbl">less CPU / consumer</span></div>
+                <div class="stat"><span class="num">O(1)</span><span class="lbl">RAM in subscribers</span></div>
+                <div class="stat"><span class="num">~30 fps</span><span class="lbl">held to 64 readers, 0% loss</span></div>
+                <div class="stat"><span class="num">330</span><span class="lbl">ROS message types covered</span></div>
+            </div>
 
-            <h2>The Solution — A Same-Host Shared-Memory Transport</h2>
-            <p>The producer writes <strong>one copy</strong> of each frame into <code>/dev/shm</code>, signals readers with a <strong>single futex wake</strong>, and every consumer maps the same physical pages and reads it in place. One write. One copy in memory, no matter how many models read it. No per-subscriber serialization, no per-subscriber copy, no middleware machinery — and idle readers sit at <strong>~0% CPU</strong> instead of spinning. The N×K explosion collapses: the frame exists once, and everyone reads it where it sits.</p>
-            <img class="project-video" src="graphs/overview.png" alt="Architecture: one write into shared memory, many zero-copy readers.">
+            <!-- ===================== INDEX ===================== -->
+            <nav class="toc">
+                <h2>Index</h2>
+                <ol>
+                    <li><a href="#problem">The problem I hit</a></li>
+                    <li><a href="#idea">The idea in one paragraph</a></li>
+                    <li><a href="#different">How it differs from the industry standards</a></li>
+                    <li><a href="#how">How it works — the on-disk contract</a></li>
+                    <li><a href="#graphs">The graphs, explained</a></li>
+                    <li><a href="#bench">How the benchmarks were run</a></li>
+                    <li><a href="#build">Building &amp; coding with it</a></li>
+                    <li><a href="#usecases">Example use cases</a></li>
+                    <li><a href="#built">How it was built</a></li>
+                    <li><a href="#stack">Tech stack &amp; scope</a></li>
+                </ol>
+            </nav>
+        </section>
 
-            <h2>The Results</h2>
-            <p>I benchmarked it against the three production zero-copy transports — <strong>FastDDS data-sharing, CycloneDDS+iceoryx, and ros2_shm_msgs</strong> — following industry-standard methodology (Apex.AI's <code>performance_test</code> approach: coordinated-omission-safe scheduling, percentile distributions, K=4 repeated runs with variance, whole-system CPU accounting, byte-identical payloads across all four).</p>
+        <!-- ===================== 1. PROBLEM ===================== -->
+        <section>
+            <h2 id="problem">1 · The Problem I Hit</h2>
+            <p>A few months ago I was running a perception setup in <strong>NVIDIA Isaac Sim</strong> that should have been simple, and it brought my machine to its knees. I had multiple simulated camera feeds, and a stack of models that each needed every feed — <strong>YOLO, GroundedDINO, Florence, and a set of LLM APIs</strong>. So I tried to wire it up the standard way: package each model as a ROS 2 node, subscribe to the camera topics, let ROS 2 handle the plumbing. It didn't work out. As I scaled it up, the whole thing buckled.</p>
+            <p>The math was the problem. With <strong>N camera streams and K subscribers</strong>, every frame from every camera was getting serialized and copied to every consumer — so the transport load scaled as <strong>N×K</strong>. Three cameras into a handful of models wasn't a handful of streams; it was a multiplying wall of redundant copies, the same megabyte frames serialized and copied over and over, 30 times a second, per camera, per subscriber.</p>
+            <p>My CPU pinned to 100%. And the worst part wasn't even the dropped frames — it was that <strong>Isaac Sim itself started hanging under the load</strong>. The simulation couldn't keep real time, so the results coming out of it weren't even meaningful anymore. I wasn't measuring my models; I was measuring my transport choking.</p>
+            <p>So I went hunting, and the culprit wasn't my models or my code. It was the <strong>ROS 2 transport layer underneath</strong> — serialize-and-copy, per subscriber, per frame. So I built something to bypass it entirely.</p>
+
+            <figure class="fig">
+                <img src="graphs/dds_path.png" alt="DDS path: each subscriber gets its own serialize + copy.">
+                <figcaption>The DDS path: every subscriber pays its own serialize + copy. N readers ⇒ N times the work.</figcaption>
+            </figure>
+        </section>
+
+        <!-- ===================== 2. THE IDEA ===================== -->
+        <section>
+            <h2 id="idea">2 · The Idea in One Paragraph</h2>
+            <p>It's a <strong>same-host shared-memory transport</strong>. The producer writes <strong>one copy</strong> of each frame into <code>/dev/shm</code>, signals readers with a <strong>single futex wake</strong>, and every consumer maps the same physical pages and reads it in place. One write. One copy in memory, no matter how many models read it. No per-subscriber serialization, no per-subscriber copy, no middleware machinery, and idle readers sit at <strong>~0% CPU</strong> instead of spinning. The N×K explosion collapses — the frame exists once, and everyone reads it where it sits.</p>
+
+            <figure class="fig">
+                <img src="graphs/bridge_path.png" alt="Bridge path: one write into shared memory, every reader maps the same bytes.">
+                <figcaption>The bridge path: one write into <code>/dev/shm</code>, one <code>FUTEX_WAKE</code> for everyone, every reader maps the same physical pages.</figcaption>
+            </figure>
+
+            <div class="callout win">
+                <p><strong>The structural difference:</strong> the writer's publish is <strong>O(1)</strong> — a single <code>FUTEX_WAKE</code> regardless of reader count — and RAM is <strong>O(1)</strong> in subscribers (one physical copy, mapped by all). Total delivery CPU is still O(N) readers, because each reader wakes and reads its own view — but with a <strong>~8× smaller constant</strong> than DDS, and no busy-polling.</p>
+            </div>
+        </section>
+
+        <!-- ===================== 3. HOW IT DIFFERS ===================== -->
+        <section>
+            <h2 id="different">3 · How It Differs From the Industry Standards</h2>
+            <p>I benchmarked against the three production zero-copy transports — <strong>FastDDS data-sharing, CycloneDDS+iceoryx, and ros2_shm_msgs</strong>. They are excellent, heavily optimized systems. The difference isn't that they're slow; it's that they're built around a general-purpose pub/sub model (discovery, QoS, per-subscriber delivery semantics) that carries overhead this specialized workload doesn't need.</p>
+
+            <table class="cmp">
+                <thead><tr><th>Concern</th><th>DDS transports</th><th>ros2_shm_fanout</th></tr></thead>
+                <tbody>
+                    <tr><td>per-subscriber copy</td><td>serialize + copy per subscriber</td><td>one physical copy, mapped by all</td></tr>
+                    <tr><td>publish/notify cost</td><td>delivery work per subscriber</td><td>one <code>FUTEX_WAKE</code> for all (O(1))</td></tr>
+                    <tr><td>idle reader CPU</td><td>executor/poll overhead</td><td>~0% (sleeps on a futex)</td></tr>
+                    <tr><td>RAM vs subscriber count</td><td>grows with consumers</td><td>flat — O(1)</td></tr>
+                    <tr><td>discovery / QoS machinery</td><td>full RTPS discovery + QoS state</td><td>none — a name in <code>/dev/shm</code></td></tr>
+                    <tr><td>non-ROS consumers</td><td>must join the ROS/DDS graph</td><td>any process that can <code>mmap</code> a file</td></tr>
+                    <tr><td>single-subscriber latency</td><td><strong>wins</strong> (loaned zero-copy)</td><td>copies bytes ⇒ O(size)</td></tr>
+                </tbody>
+            </table>
+
+            <p>Two design choices make the bridge ROS-agnostic in a way the DDS stacks aren't:</p>
             <ul>
-                <li><strong>~8× less CPU per consumer</strong> — and the gap widens with scale. At 64 subscribers the bridge sat at <strong>78% of one core</strong> while the DDS paths burned ~6. At a realistic fan-out of 4–8 models, it's already <strong>~10–16× leaner</strong>.</li>
-                <li><strong>Flat RAM</strong> no matter how many consumers — one physical copy, mapped by all. Genuinely O(1) in subscriber count.</li>
-                <li><strong>The only transport that held ~30 fps with zero frame loss</strong> out to 64 consumers — the DDS paths fell behind under CPU load, and CycloneDDS hit a hard limit at 32.</li>
-                <li><strong>Type-agnostic</strong> — works with any of the ~330 ROS message types (25 heavy types take a true zero-copy path; the rest fall back cleanly), not just a fixed handful.</li>
+                <li><strong>The writer can pull from a ROS 2 topic, but the reader doesn't need ROS at all.</strong> The FLAT path writes <strong>raw frame bytes</strong> with a small binary header + a JSON recipe — not a ROS-serialized blob. So a plain Python script, a CUDA program, or a model server in a separate conda env can read your camera frames directly: zero ROS overhead, zero bridging.</li>
+                <li><strong>This matters because not every CV model ships as a ROS 2 package</strong> — and plenty of the newest perception and foundation models never will. They arrive as Python libraries, inference servers, or API wrappers. This lets you feed them the live stream without forcing them into the ROS graph first.</li>
             </ul>
 
-            <h2>Benchmarks</h2>
-            <p><strong>Delivered rate vs subscribers</strong> — the bridge holds full rate while every DDS path collapses under CPU pressure (CycloneDDS crashes at 32).</p>
-            <img class="project-video" src="graphs/fps_vs_subs_1m.png" alt="Delivered frame rate vs number of subscribers — the bridge holds ~30 fps to 64 subscribers while the DDS transports drop off.">
-            <p><strong>Latency vs subscribers</strong> — DDS-loaned wins at a single subscriber, but the curves cross near N≈16; beyond that the bridge leads as the DDS paths become CPU-starved.</p>
-            <img class="project-video" src="graphs/latency_vs_subs_1m.png" alt="Median latency vs subscriber count — curves cross near 16 subscribers.">
-            <p><strong>Latency vs payload size (single subscriber)</strong> — the one axis where true zero-copy DDS-loaned is categorically better: it hands over a pointer (flat in size) while the bridge copies bytes (O(size)).</p>
-            <img class="project-video" src="graphs/latency_vs_size_n1.png" alt="Median latency vs payload size at a single subscriber.">
+            <div class="callout">
+                <p><strong>Where the standards still win:</strong> for a <em>single</em> subscriber, the established DDS methods have the edge on latency — they're heavily optimized for that case, and true loaned zero-copy hands over a pointer (nothing is copied). The bridge's advantage is <strong>CPU efficiency across every process</strong>, and it pulls further ahead as the number of subscribers grows. Which is exactly the problem I started with: many cameras, many models, one machine.</p>
+            </div>
+        </section>
 
-            <h2>It's Also ROS-Agnostic</h2>
-            <p>The writer can pull from a ROS 2 topic, but <strong>the reader doesn't need ROS at all</strong>. It writes raw bytes, so any process that can <code>mmap</code> a file can consume the stream — a plain Python script, a CUDA program, or a model server in a separate conda env can read your camera frames directly, with zero ROS overhead and zero bridging.</p>
-            <p>This matters because not every CV model ships as a ROS 2 package — and plenty of the newest perception and foundation models never will. They arrive as Python libraries, inference servers, or API wrappers. This lets you feed them the live stream without forcing them into the ROS graph first.</p>
+        <!-- ===================== 4. HOW IT WORKS ===================== -->
+        <section>
+            <h2 id="how">4 · How It Works — The On-Disk Contract</h2>
+            <p>Each named stream <code>NAME</code> is three files in <code>/dev/shm</code>. Two metadata channels at two rates — a fast binary header per frame, a slow JSON recipe only on structural change — is what gives both low latency and correctness.</p>
 
-            <h2>Why It Matters on Real Hardware</h2>
-            <p>The benchmark gaps above were measured on a <strong>single machine with everything in one process</strong> — the most forgiving possible setup. On a real deployment the difference explodes. Real robots run each model as its own process, often across separate machines, where the per-subscriber overhead DDS pays — discovery, executors, cross-process copies — stacks up fast. Everything the controlled benchmark removed is overhead the DDS stack pays in production and the shared-memory path mostly doesn't. <strong>The advantage shown here is the floor, not the ceiling.</strong></p>
-            <p>And lower CPU isn't just a benchmark number. Every core you're not spending on moving bytes is a core left for <strong>inference, planning, and control</strong>. On battery-powered and edge robots, it's directly less power drawn and more thermal headroom. The transport getting out of the way is the whole point.</p>
+            <table class="cmp">
+                <thead><tr><th>File</th><th>What</th><th>Update rate</th></tr></thead>
+                <tbody>
+                    <tr><td>NAME_header</td><td>64-byte binary header, mmap'd, fixed offsets</td><td>every frame (atomic)</td></tr>
+                    <tr><td>NAME_frame</td><td>raw payload (FLAT buffer or CDR bytes)</td><td>every frame</td></tr>
+                    <tr><td>NAME_recipe.json</td><td>human-readable decode recipe (topic, type, shape)</td><td>only on structural change</td></tr>
+                </tbody>
+            </table>
 
-            <h2>Scope</h2>
-            <p>For a single subscriber, the established DDS methods still have the edge on latency — they're heavily optimized for that case. The bridge's advantage is <strong>CPU efficiency across every process</strong>, and it pulls further ahead as the number of subscribers grows. Which is exactly the problem I started with: <strong>many cameras, many models, one machine.</strong></p>
+            <p>The 64-byte header carries <code>seq</code>, <code>encoding_id</code>, <code>data_size</code>, <code>width/height/channels</code>, <code>dtype_id</code>, <code>timestamp_ns</code>, and a type-name hint. Because <code>data_size</code> lives in the header, payload sizes can vary <strong>every frame at zero cost</strong> — no recipe rewrite.</p>
 
-            <h2>Tech Stack</h2>
+            <h3>The seqlock (lock-free, the writer never blocks)</h3>
+            <p>The writer never waits on readers:</p>
+            <pre><code><span class="cm">// writer publish</span>
+seq++;            <span class="cm">// now ODD  = "a write is in progress"</span>
+memcpy(frame, payload, len);   <span class="cm">// one copy into shared memory</span>
+fill_header(...);
+seq++;            <span class="cm">// now EVEN = "stable / published"</span>
+notify();         <span class="cm">// one FUTEX_WAKE releases ALL waiting readers</span></code></pre>
+            <p>A reader does <strong>read seq → read body → re-read seq</strong>; the frame is valid only if both reads saw the same <strong>even</strong> value — otherwise it caught a write in progress and retries. Classic seqlock: correct for one writer + many readers, and the writer is favored so it never stalls.</p>
+
+            <h3>Wakeup: a futex, not a busy-poll</h3>
+            <p>A naive reader would spin-read the seq counter, burning a core each. Instead the header's seq word doubles as a <strong>futex</strong>: after publishing, the writer issues one <code>FUTEX_WAKE</code> that releases every waiting reader at once. Readers <code>FUTEX_WAIT</code> at ~0% CPU until woken. This is the source of the gentle CPU slope.</p>
+
+            <h3>FLAT vs CDR — two encodings, one generic reader</h3>
+            <table class="cmp">
+                <thead><tr><th>Encoding</th><th>Count</th><th>What</th><th>Reconstructed as</th></tr></thead>
+                <tbody>
+                    <tr><td>FLAT (zero-copy)</td><td>25</td><td>heavy numeric buffers (image / cloud / grid / tensor)</td><td>numpy <code>ndarray</code> (zero-copy view)</td></tr>
+                    <tr><td>CDR (universal)</td><td>305</td><td>every other topic type — structs, nested, variable-length</td><td>rebuilt ROS message object</td></tr>
+                    <tr><td><strong>Total</strong></td><td><strong>330</strong></td><td>all topic message types</td><td>—</td></tr>
+                </tbody>
+            </table>
+            <p>Adding a new type costs nothing on the universal path: CDR needs no per-type code — <code>serialize_message</code> / <code>deserialize_message</code> handle all 305 generically; you just point a writer at the topic. FLAT is an opt-in fast path with a small per-type extractor. <strong>The reader never changes.</strong></p>
+
+            <h3>A ROS-agnostic core with thin adapters</h3>
+            <p>The library is split into a <strong>ROS-free core</strong> (<code>libshm_bridge_cpp.so</code> — seqlock + futex + the byte contract, no ROS/DDS/deps) and small <strong>adapters</strong> that plug one outside world into it. An ingest adapter subscribes in the foreign API and calls <code>Writer::write_flat(...)</code>; an egress adapter calls <code>Reader::wait_and_read(...)</code> and forwards the frame. Want a ROS 1 bridge, a GStreamer source, a UDP server? Write one small <code>.cpp</code> — the core never changes.</p>
+        </section>
+
+        <!-- ===================== 5. THE GRAPHS ===================== -->
+        <section>
+            <h2 id="graphs">5 · The Graphs, Explained</h2>
+
+            <h3>CPU vs subscribers (1 MiB) — the headline</h3>
+            <figure class="fig">
+                <img src="graphs/cpu_vs_subs_1m.png" alt="CPU vs subscribers, 1 MiB.">
+                <figcaption>Both lines rise with subscriber count (delivering to N readers is inherently O(N) work) — but the bridge's slope is far gentler: ~1.2%/subscriber vs every DDS transport's ~10%/subscriber.</figcaption>
+            </figure>
+            <p>At N=64 the bridge raw path sits at <strong>78% of one core</strong>; FastDDS / ros2_shm_msgs are at <strong>~620–670%</strong> (~6–7 cores). This is the futex payoff: readers sleep until woken (no busy-poll), so the per-subscriber CPU constant is small. The win is a lower <em>slope</em>, not a lower complexity class. RAM, by contrast, <em>is</em> O(1) — flat ~43–45% across N=1→64 — because all readers map one shared copy.</p>
+
+            <h3>CPU vs subscribers (4 MiB) — the story holds at larger sizes</h3>
+            <figure class="fig">
+                <img src="graphs/cpu_vs_subs_4m.png" alt="CPU vs subscribers, 4 MiB.">
+                <figcaption>Same structural gap at a larger payload: the bridge stays near the floor as the DDS paths climb.</figcaption>
+            </figure>
+
+            <h3>Latency vs subscribers (1 MiB) — the crossover</h3>
+            <figure class="fig">
+                <img src="graphs/latency_vs_subs_1m.png" alt="Latency vs subscribers, 1 MiB.">
+                <figcaption>At low N, FastDDS-loaned wins latency. The curves cross near N≈16: beyond it the bridge leads, because the DDS transports become CPU-starved and miss deadlines while the bridge still has headroom.</figcaption>
+            </figure>
+
+            <h3>Latency vs payload size (N=1) — O(1) zero-copy vs O(size) copy</h3>
+            <figure class="fig">
+                <img src="graphs/latency_vs_size_n1.png" alt="Latency vs payload size, single subscriber.">
+                <figcaption>FastDDS-loaned is flat in size (~0.15 ms at 1–8 MiB) because true zero-copy hands over a pointer. The bridge's read copies the bytes, so its latency is O(size) (0.21 → 1.2 ms). This is the one axis where DDS-loaned is categorically better.</figcaption>
+            </figure>
+
+            <h3>Delivered rate vs subscribers (1 MiB) — integrity under load</h3>
+            <figure class="fig">
+                <img src="graphs/fps_vs_subs_1m.png" alt="Delivered frame rate vs subscribers, 1 MiB.">
+                <figcaption>The bridge holds ~29.8 fps with ~0% loss to N=64. The DDS transports drop their delivered rate (down to 13–25 fps) once CPU-bound; CycloneDDS crashes at N=32 (iceoryx pool exhaustion).</figcaption>
+            </figure>
+        </section>
+
+        <!-- ===================== 6. BENCHMARKS ===================== -->
+        <section>
+            <h2 id="bench">6 · How the Benchmarks Were Run</h2>
+            <p>The harness follows the conventions of <strong>Apex.AI <code>performance_test</code></strong> — the de-facto ROS 2 transport benchmark — plus standard latency-benchmark hygiene:</p>
             <ul>
-                <li><strong>C++17</strong> core — lock-free <strong>seqlock</strong> writer + <code>FUTEX_WAKE</code> signalling.</li>
+                <li><strong>Apples-to-apples modes:</strong> every transport tested in both a <em>zero-copy / loaned / raw</em> mode (consumer gets a pointer) and a <em>normal / deserialize</em> mode (consumer rebuilds a typed message each frame). The bridge's <code>raw_flat</code> and <code>deserialize</code> match the DDS loaned/normal split exactly.</li>
+                <li><strong>Coordinated-omission-safe:</strong> fixed 30 Hz publish on an absolute schedule (<code>sleep_until(t0 + k·period)</code>) — a late frame still gets its true timestamp.</li>
+                <li><strong>In-payload timestamp:</strong> <code>CLOCK_MONOTONIC</code> stamped into the first 8 bytes at publish, read at receipt → end-to-end latency per frame.</li>
+                <li><strong>Percentiles, not just mean:</strong> p50 / p90 / p99 / p99.9 / max per run; first 20% of samples trimmed for warm-up.</li>
+                <li><strong>K=4 repeated runs</strong> → mean ± standard deviation (the error bars).</li>
+                <li><strong>Whole-system-fair CPU:</strong> the headline CPU is the <strong>pid-set sum</strong> (benchmark process + the iox-roudi daemon for CycloneDDS), so DDS gets no free ride for work it offloads to a daemon.</li>
+                <li><strong>Byte-identical payloads</strong> across all four transports at each size rung.</li>
+            </ul>
+
+            <p><strong>The grid:</strong> payload sizes 1 / 2 / 4 / 8 MiB × subscriber counts N = 1, 4, 16, 32, 64 × ~8 transport-modes × K=4 runs ≈ hundreds of runs, hundreds of thousands of individually-timed frames. Each data point is ~300 frames/subscriber × 4 runs. Test machine: an 8-core / 12-thread laptop (i5-13420H), governor <code>powersave</code> (which inflates absolute milliseconds equally across all transports, so the comparison stays fair and the absolute numbers are conservative).</p>
+
+            <h3>Observed failure modes</h3>
+            <table class="cmp">
+                <thead><tr><th>Transport</th><th>What happened under load</th></tr></thead>
+                <tbody>
+                    <tr><td>CycloneDDS + iceoryx</td><td>SIGABRT (invalid allocator) at N=32; couldn't start at all for 4/8 MiB — RouDi mempool can't hold those chunks. Least robust.</td></tr>
+                    <tr><td>ros2_shm_msgs</td><td>SIGSEGV at N=1 for the 8 MiB fixed type; CPU-gated at larger N. FastDDS underneath, so it inherits ~10%/sub plus extra fragility.</td></tr>
+                    <tr><td>FastDDS</td><td>Never crashed, but hit the 95% CPU gate at N=64 for larger sizes — it runs out of cores, not memory.</td></tr>
+                    <tr><td>bridge</td><td>Only the <em>deserialize</em> mode at 8 MiB / N=64 gated (~10 cores doing per-frame 8 MiB copies × 64); the raw path never gated anywhere.</td></tr>
+                </tbody>
+            </table>
+
+            <h3>Why this is the floor, not the ceiling</h3>
+            <p>These gaps were measured <strong>intra-process</strong> — pub + subs as threads in one address space — the most forgiving possible setup. That removes the costs DDS pays in production: participant <strong>discovery</strong>, N+1 <strong>executors</strong> competing for cores, and <strong>cross-process copies</strong>. Real robots run each model as its own process, often across separate machines, where that overhead stacks up fast. Everything the controlled benchmark removed is overhead the DDS stack pays in deployment and the shared-memory path mostly doesn't — the bridge's <code>Writer</code>/<code>Reader</code> already work across processes unchanged.</p>
+            <div class="callout win"><p><strong>So the advantage shown here is the floor, not the ceiling.</strong> On a real multi-process, multi-machine deployment, the gap is expected to widen — and on real hardware, every core you're not spending on moving bytes is a core left for inference, planning, and control. On battery and edge robots, that's directly less power drawn and more thermal headroom.</p></div>
+        </section>
+
+        <!-- ===================== 7. BUILD & CODE ===================== -->
+        <section>
+            <h2 id="build">7 · Building &amp; Coding With It</h2>
+
+            <h3>Use the library with zero build (a clone ships a prebuilt x86-64 .so)</h3>
+            <pre><code>git clone https://github.com/rajpcrj/ros2_shm_fanout.git
+cd ros2_shm_fanout
+g++ -std=c++17 my.cpp -o my -Iprebuilt/include -Lprebuilt/lib -lshm_bridge_cpp -lpthread
+LD_LIBRARY_PATH=$PWD/prebuilt/lib ./my
+<span class="cm"># or install it system-wide, then no -I/-L needed anywhere:</span>
+./install_lib.sh        <span class="cm"># cp .so + headers -> /usr/local + ldconfig</span></code></pre>
+
+            <h3>Build from source (ROS nodes + benchmarks)</h3>
+            <pre><code>source /opt/ros/humble/setup.bash
+colcon build --packages-select shm_bridge_cpp --cmake-args -DCMAKE_BUILD_TYPE=Release
+source install/setup.bash</code></pre>
+
+            <h3>The whole library API — write and read a frame</h3>
+            <pre><code><span class="cm">// produce: one copy into shared memory</span>
+<span class="kw">#include</span> <span class="st">&lt;shm_bridge_cpp/shm_bridge.hpp&gt;</span>
+shm_bridge::<span class="fn">Writer</span> w(<span class="st">"rgb"</span>, 1920*1080*4);
+w.<span class="fn">write_flat</span>(ptr, len, W, H, 3, shm_bridge::DType::U8,
+             <span class="st">"sensor_msgs/msg/Image"</span>);   <span class="cm">// 1 copy in, then one FUTEX_WAKE</span>
+
+<span class="cm">// consume: ~0% CPU until a new frame, then read it in place</span>
+shm_bridge::<span class="fn">Reader</span> r(<span class="st">"rgb"</span>);
+shm_bridge::<span class="fn">Frame</span> f;
+<span class="kw">while</span> (running) {
+    <span class="kw">if</span> (r.<span class="fn">wait_and_read</span>(f, 100ull*1000*1000))   <span class="cm">// 100 ms timeout</span>
+        use(f.data, f.width, f.height, f.seq);      <span class="cm">// f.seq gaps = dropped frames</span>
+}</code></pre>
+
+            <h3>Run anything (ROS ↔ SHM ↔ ROS, or pure C++ with no ROS)</h3>
+            <pre><code><span class="cm"># pure C++ (no ROS), bundled sample image:</span>
+ros2 run shm_bridge_cpp ex_write_cpp &amp; ros2 run shm_bridge_cpp ex_read_cpp
+<span class="cm"># ROS topic -> SHM -> ROS topic:</span>
+ros2 run shm_bridge_cpp ex_ros2_to_shm --ros-args -p topic:=/image -p stream:=rgb
+ros2 run shm_bridge_cpp ex_shm_to_ros2 --ros-args -p stream:=rgb -p topic:=/from_shm</code></pre>
+
+            <h3>Python talks the same /dev/shm contract — no .so linking</h3>
+            <pre><code>export PYTHONPATH=src/shm_bridge_python:$PYTHONPATH
+python3 examples/python/write_py.py demo &amp;   <span class="cm"># Python writer</span>
+python3 examples/python/read_py.py  demo      <span class="cm"># Python reader — OR read it from C++ read_cpp!</span></code></pre>
+            <p>Because the on-disk bytes are identical, a C++ writer is read by a Python reader and vice-versa, <strong>with zero glue code</strong> — Python uses <code>mmap</code> + <code>numpy.frombuffer</code> (a zero-copy view). If you specifically want Python to drive the C++ <code>wait_and_read</code> futex (true 0% CPU blocking), there's a pybind11 wrapper too.</p>
+        </section>
+
+        <!-- ===================== 8. USE CASES ===================== -->
+        <section>
+            <h2 id="usecases">8 · Example Use Cases</h2>
+            <ol>
+                <li><strong>One camera → many consumers on one PC.</strong> The original problem: a single feed into detection + segmentation + depth + pose + classification, with no per-model copy tax.</li>
+                <li><strong>Feed a non-ROS program</strong> (inference server, GUI, logger). Any process that can <code>mmap</code> a file reads the stream — a separate conda env, a CUDA program, a foundation-model API wrapper — with zero ROS in the loop.</li>
+                <li><strong>Send ROS topics to another computer.</strong> Read locally, push the raw bytes over a UDP server (<code>shm_to_udp</code>) — no discovery handshake, no CDR on the hot path, lowest-overhead one-way hop on a clean LAN.</li>
+                <li><strong>Stream raw frames to many network clients.</strong> A tiny UDP server binds a port and fans the raw <code>/dev/shm</code> bytes straight onto the wire to any number of subscribing clients.</li>
+                <li><strong>Bridge between C++ and Python.</strong> The shared contract <em>is</em> the API — either language reads the other's streams natively.</li>
+                <li><strong>Embed the library in your own app.</strong> The ROS-free core installs system-wide; link <code>-lshm_bridge_cpp -lpthread</code> and you have the transport in any C++ program.</li>
+                <li><strong>Reproduce / extend the benchmarks.</strong> The full harness, raw <code>sweep.csv</code>, and graph generator ship in the repo.</li>
+            </ol>
+        </section>
+
+        <!-- ===================== 9. HOW IT WAS BUILT ===================== -->
+        <section>
+            <h2 id="built">9 · How It Was Built</h2>
+            <p>The repo began as loose scripts moving RealSense RGB + depth out of ROS topics into shared memory. It grew, in gated phases — each one proven by a working test before moving on — into a generic, type-agnostic transport.</p>
+
+            <figure class="fig">
+                <img src="graphs/pipeline.png" alt="The end-to-end pipeline: ROS topics on machine A, over the network, reconstructed on machine B.">
+                <figcaption>The end-to-end pipeline — all ROS topics on machine A, shipped over UDP, reconstructed as identical ROS topics on machine B.</figcaption>
+            </figure>
+
+            <table class="cmp">
+                <thead><tr><th>Phase</th><th>What was decided</th></tr></thead>
+                <tbody>
+                    <tr><td>1 · Restructure</td><td>Split into two real ROS 2 packages (ament_cmake C++ + ament_python) so one <code>colcon build</code> builds both.</td></tr>
+                    <tr><td>2 · Design</td><td>The hard conversation about what "type-agnostic" can mean. Conclusion: the <strong>reader can be generic; the writer cannot</strong> — type knowledge concentrates in the writer + recipe. Rendering all types is impossible (a schema gives fields, never visual meaning), so scope became <em>reconstruct the message</em>, not <em>render it</em>.</td></tr>
+                    <tr><td>3 · The contract</td><td>The core invention: the three-file <code>/dev/shm</code> layout, the 64-byte binary header, and the seqlock. The counter had to be binary and atomically addressable — which is <em>why</em> it lives in the header, not the JSON.</td></tr>
+                    <tr><td>4 · Python first</td><td><code>rclpy</code> introspection is easier, so the recipe format was nailed in Python and proven offline (11/11: FLAT round-trip, CDR round-trip on a nested type, and seqlock tear rejection) before porting.</td></tr>
+                    <tr><td>5 · Port to C++</td><td>All four cross-language combinations verified live (Py→C++, C++→Py, FLAT, CDR) — the contract is only real if both languages interoperate byte-for-byte.</td></tr>
+                    <tr><td>6 · Classify every type</td><td>An offline tool read every installed <code>.msg</code>: 330 topic types split into 25 heavy/FLAT carriers vs 305 CDR. A key point settled here: CDR needs no per-type adapter — it's already universal.</td></tr>
+                    <tr><td>7 · One adapter, per-stream processes</td><td>A single <code>adapt()</code> entry point, auto-resolving each topic's type from the graph, one OS process per stream for isolation, plus an <code>--all</code> supervisor that spawns one process per live topic.</td></tr>
+                    <tr><td>8 · Full FLAT in C++</td><td>Typed zero-copy extractors for the heavy types in C++ to match Python — each returning a pointer into the message buffer, no copy.</td></tr>
+                </tbody>
+            </table>
+
+            <p>The throughline: the <strong>writer owns type knowledge</strong> (encode), the <strong>reader is generic</strong> (decode by recipe), and this asymmetry is enforced everywhere. CDR is the universal backstop; FLAT is the opt-in fast path. Adding a new stream is either "just list the topic" (CDR) or "add one extractor" (FLAT) — the reader never changes.</p>
+        </section>
+
+        <!-- ===================== 10. STACK & SCOPE ===================== -->
+        <section>
+            <h2 id="stack">10 · Tech Stack &amp; Scope</h2>
+            <ul>
+                <li><strong>C++17 core</strong> — lock-free <strong>seqlock</strong> writer + <code>FUTEX_WAKE</code> signalling, zero ROS/DDS deps.</li>
                 <li><strong>Linux shared memory</strong> (<code>/dev/shm</code>, <code>mmap</code>) — one physical copy, mapped by all readers.</li>
-                <li><strong>ROS 2 (Humble)</strong> — type-agnostic writer covering all 330 topic message types (FLAT zero-copy + CDR fallback).</li>
+                <li><strong>ROS 2 (Humble)</strong> — type-agnostic writer covering all 330 topic message types (FLAT zero-copy + CDR fallback) via <code>GenericSubscription</code>.</li>
                 <li><strong>Python</strong> adapter speaking the same <code>/dev/shm</code> contract, plus a pybind11 wrapper.</li>
-                <li><strong>Benchmark harness</strong> following Apex.AI <code>performance_test</code> methodology.</li>
+                <li><strong>POSIX UDP</strong> adapters for the cross-machine hop (fire-and-forget + a multi-client server).</li>
+                <li><strong>Benchmark harness</strong> following Apex.AI <code>performance_test</code> methodology, with raw data + reproducible graph generation.</li>
             </ul>
+            <div class="callout">
+                <p><strong>Scope:</strong> the win is <strong>CPU + memory + delivery integrity at fan-out</strong> on a <strong>single machine</strong> — not single-subscriber latency, and not a cross-machine transport by itself (<code>/dev/shm</code> is local; the UDP adapters carry it across the network). For single-reader minimum latency, DDS data-sharing is competitive or better. This bridge's win is CPU and scale.</p>
+            </div>
+            <p style="margin-top:1.6em;">
+                <a href="https://github.com/rajpcrj/ros2_shm_fanout" target="_blank">Full methodology, data, graphs, and reproduction steps on GitHub →</a>
+            </p>
         </section>
     </main>
     <footer>

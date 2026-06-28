@@ -13,7 +13,6 @@
             <h1 class="personal-name">Loading...</h1>
             <div class="contact-info">
                 <p><span class="personal-email">Loading...</span></p>
-                <p><span class="personal-phone">Loading...</span></p>
             </div>
         </div>
     </header>
@@ -25,7 +24,6 @@
             <ul>
                 <li><strong>Name:</strong> <span class="personal-name">Loading...</span></li>
                 <li><strong>Email:</strong> <span class="personal-email">Loading...</span></li>
-                <li><strong>Phone:</strong> <span class="personal-phone">Loading...</span></li>
                 <li><strong>LinkedIn:</strong> <a class="personal-linkedin" href="#" target="_blank">Loading...</a></li>
                 <li><strong>GitHub:</strong> <a class="personal-github" href="#" target="_blank">Loading...</a></li>
             </ul>
@@ -75,7 +73,7 @@
                     <p>While running a multi-camera perception stack in NVIDIA Isaac Sim, ROS 2's default transport became the bottleneck: with N camera streams and K subscribers, every frame was serialized and copied per consumer, so load scaled as N×K — pinning the CPU and stalling the simulator itself. I built a same-host shared-memory transport that writes one copy of each frame into /dev/shm and signals readers with a single futex wake; every consumer maps the same physical pages and reads in place. Benchmarked against FastDDS, CycloneDDS+iceoryx, and ros2_shm_msgs using Apex.AI's performance_test methodology, it delivered ~8× less CPU per consumer, flat RAM regardless of subscriber count, and was the only transport to hold ~30 fps with zero frame loss out to 64 consumers. It's type-agnostic (all ~330 ROS message types) and ROS-agnostic — any process that can mmap a file can read the stream, no ROS required.</p>
                     <div class="project-links">
                         <a href="https://github.com/rajpcrj/ros2_shm_fanout" target="_blank">&lt;/&gt; Code</a>
-                        <a href="#" target="_blank">📄 Report</a>
+                        <a href="projects/shm_fanout/index.html">📖 Project Explanation</a>
                     </div>
                 </div>
             </div>
