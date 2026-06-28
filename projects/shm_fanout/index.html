@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ros2_shm_fanout – A Shared-Memory Transport for High-Fan-Out Perception</title>
+    <link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+    <header>
+        <h1>ros2_shm_fanout – A Shared-Memory Transport for High-Fan-Out Perception</h1>
+    </header>
+    <main>
+        <a class="back-home" href="../../index.html">← Back to portfolio</a>
+        <section>
+            <p><strong>Systems / Robotics Infrastructure</strong> · C++17 · Python · ROS 2 · Linux shared memory</p>
+            <p>
+                <a href="https://github.com/rajpcrj/ros2_shm_fanout" target="_blank">View Code on GitHub →</a>
+            </p>
+
+            <img class="project-video" src="graphs/cpu_vs_subs_1m.png" alt="CPU usage vs number of subscribers — the bridge stays near the floor while every DDS transport climbs to ~6 cores.">
+
+            <h2>The Problem</h2>
+            <p>While running a perception setup in <strong>NVIDIA Isaac Sim</strong>, a setup that should have been simple brought the machine to its knees. Multiple simulated camera feeds had to fan out to a stack of models — <strong>YOLO, GroundedDINO, Florence, and several LLM APIs</strong> — each needing every feed. The standard approach was to package each model as a ROS 2 node, subscribe to the camera topics, and let ROS 2 handle the plumbing. As it scaled up, the whole thing buckled.</p>
+            <p>The math was the problem. With <strong>N camera streams and K subscribers</strong>, every frame from every camera was serialized and copied to every consumer — so transport load scaled as <strong>N×K</strong>. Three cameras into a handful of models wasn't a handful of streams; it was a multiplying wall of redundant copies — the same megabyte frames serialized and copied over and over, 30 times a second, per camera, per subscriber.</p>
+            <p>The CPU pinned to 100%. The worst part wasn't even the dropped frames — it was that <strong>Isaac Sim itself started hanging</strong> under the load. The simulation couldn't keep real time, so its results were no longer meaningful. I wasn't measuring my models; I was measuring my transport choking. The culprit wasn't the models or the code — it was the <strong>ROS 2 transport layer underneath</strong>: serialize-and-copy, per subscriber, per frame. So I built something to bypass it entirely.</p>
+
+            <h2>The Solution — A Same-Host Shared-Memory Transport</h2>
+            <p>The producer writes <strong>one copy</strong> of each frame into <code>/dev/shm</code>, signals readers with a <strong>single futex wake</strong>, and every consumer maps the same physical pages and reads it in place. One write. One copy in memory, no matter how many models read it. No per-subscriber serialization, no per-subscriber copy, no middleware machinery — and idle readers sit at <strong>~0% CPU</strong> instead of spinning. The N×K explosion collapses: the frame exists once, and everyone reads it where it sits.</p>
+            <img class="project-video" src="graphs/overview.png" alt="Architecture: one write into shared memory, many zero-copy readers.">
+
+            <h2>The Results</h2>
+            <p>I benchmarked it against the three production zero-copy transports — <strong>FastDDS data-sharing, CycloneDDS+iceoryx, and ros2_shm_msgs</strong> — following industry-standard methodology (Apex.AI's <code>performance_test</code> approach: coordinated-omission-safe scheduling, percentile distributions, K=4 repeated runs with variance, whole-system CPU accounting, byte-identical payloads across all four).</p>
+            <ul>
+                <li><strong>~8× less CPU per consumer</strong> — and the gap widens with scale. At 64 subscribers the bridge sat at <strong>78% of one core</strong> while the DDS paths burned ~6. At a realistic fan-out of 4–8 models, it's already <strong>~10–16× leaner</strong>.</li>
+                <li><strong>Flat RAM</strong> no matter how many consumers — one physical copy, mapped by all. Genuinely O(1) in subscriber count.</li>
+                <li><strong>The only transport that held ~30 fps with zero frame loss</strong> out to 64 consumers — the DDS paths fell behind under CPU load, and CycloneDDS hit a hard limit at 32.</li>
+                <li><strong>Type-agnostic</strong> — works with any of the ~330 ROS message types (25 heavy types take a true zero-copy path; the rest fall back cleanly), not just a fixed handful.</li>
+            </ul>
+
+            <h2>Benchmarks</h2>
+            <p><strong>Delivered rate vs subscribers</strong> — the bridge holds full rate while every DDS path collapses under CPU pressure (CycloneDDS crashes at 32).</p>
+            <img class="project-video" src="graphs/fps_vs_subs_1m.png" alt="Delivered frame rate vs number of subscribers — the bridge holds ~30 fps to 64 subscribers while the DDS transports drop off.">
+            <p><strong>Latency vs subscribers</strong> — DDS-loaned wins at a single subscriber, but the curves cross near N≈16; beyond that the bridge leads as the DDS paths become CPU-starved.</p>
+            <img class="project-video" src="graphs/latency_vs_subs_1m.png" alt="Median latency vs subscriber count — curves cross near 16 subscribers.">
+            <p><strong>Latency vs payload size (single subscriber)</strong> — the one axis where true zero-copy DDS-loaned is categorically better: it hands over a pointer (flat in size) while the bridge copies bytes (O(size)).</p>
+            <img class="project-video" src="graphs/latency_vs_size_n1.png" alt="Median latency vs payload size at a single subscriber.">
+
+            <h2>It's Also ROS-Agnostic</h2>
+            <p>The writer can pull from a ROS 2 topic, but <strong>the reader doesn't need ROS at all</strong>. It writes raw bytes, so any process that can <code>mmap</code> a file can consume the stream — a plain Python script, a CUDA program, or a model server in a separate conda env can read your camera frames directly, with zero ROS overhead and zero bridging.</p>
+            <p>This matters because not every CV model ships as a ROS 2 package — and plenty of the newest perception and foundation models never will. They arrive as Python libraries, inference servers, or API wrappers. This lets you feed them the live stream without forcing them into the ROS graph first.</p>
+
+            <h2>Why It Matters on Real Hardware</h2>
+            <p>The benchmark gaps above were measured on a <strong>single machine with everything in one process</strong> — the most forgiving possible setup. On a real deployment the difference explodes. Real robots run each model as its own process, often across separate machines, where the per-subscriber overhead DDS pays — discovery, executors, cross-process copies — stacks up fast. Everything the controlled benchmark removed is overhead the DDS stack pays in production and the shared-memory path mostly doesn't. <strong>The advantage shown here is the floor, not the ceiling.</strong></p>
+            <p>And lower CPU isn't just a benchmark number. Every core you're not spending on moving bytes is a core left for <strong>inference, planning, and control</strong>. On battery-powered and edge robots, it's directly less power drawn and more thermal headroom. The transport getting out of the way is the whole point.</p>
+
+            <h2>Scope</h2>
+            <p>For a single subscriber, the established DDS methods still have the edge on latency — they're heavily optimized for that case. The bridge's advantage is <strong>CPU efficiency across every process</strong>, and it pulls further ahead as the number of subscribers grows. Which is exactly the problem I started with: <strong>many cameras, many models, one machine.</strong></p>
+
+            <h2>Tech Stack</h2>
+            <ul>
+                <li><strong>C++17</strong> core — lock-free <strong>seqlock</strong> writer + <code>FUTEX_WAKE</code> signalling.</li>
+                <li><strong>Linux shared memory</strong> (<code>/dev/shm</code>, <code>mmap</code>) — one physical copy, mapped by all readers.</li>
+                <li><strong>ROS 2 (Humble)</strong> — type-agnostic writer covering all 330 topic message types (FLAT zero-copy + CDR fallback).</li>
+                <li><strong>Python</strong> adapter speaking the same <code>/dev/shm</code> contract, plus a pybind11 wrapper.</li>
+                <li><strong>Benchmark harness</strong> following Apex.AI <code>performance_test</code> methodology.</li>
+            </ul>
+        </section>
+    </main>
+    <footer>
+        <p>&copy; 2026 <span class="personal-name">Loading...</span>. All rights reserved.</p>
+    </footer>
+    <script src="../../script.js"></script>
+</body>
+</html>

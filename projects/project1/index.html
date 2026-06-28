@@ -3,48 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Project 1: Home Safety System – Fall Detection & Smart Stove Control</title>
-    <link rel="stylesheet" href="../style.css">
+    <title>Project 1: Home Safety System â Fall Detection & Smart Stove Control</title>
+    <link rel="stylesheet" href="../../style.css">
 </head>
 <body>
     <header>
-        <h1>Project 1: Home Safety System – Fall Detection &amp; Smart Stove Control</h1>
+        <h1>Project 1: Home Safety System â Fall Detection &amp; Smart Stove Control</h1>
     </header>
     <main>
+        <a class="back-home" href="../../index.html">← Back to portfolio</a>
         <section>
+            <video class="project-video" controls autoplay muted loop playsinline preload="auto">
+                <source src="demo.mp4" type="video/mp4">
+                Your browser does not support the video tag. <a href="demo.mp4">Download the video</a>.
+            </video>
             <p><strong>Team:</strong> Raj Priyadarshi, Zihao Hu, Morgan Waddington | Mechatronics Final Project</p>
 
             <h2>Overview</h2>
-            <p>This project addresses a critical safety gap for elderly individuals living alone. Falls are one of the leading causes of injury in this population, and an unattended electric stove during such an incident can turn a medical emergency into a life-threatening one. The Home Safety System is a wearable prototype that detects falls in real time, alerts emergency contacts with GPS location via SMS, and automatically shuts off the user's electric stove — all without requiring the user to do anything after a fall. The project was deeply personal, inspired by the team members' own grandparents' experiences.</p>
+            <p>This project addresses a critical safety gap for elderly individuals living alone. Falls are one of the leading causes of injury in this population, and an unattended electric stove during such an incident can turn a medical emergency into a life-threatening one. The Home Safety System is a wearable prototype that detects falls in real time, alerts emergency contacts with GPS location via SMS, and automatically shuts off the user's electric stove â all without requiring the user to do anything after a fall. The project was deeply personal, inspired by the team members' own grandparents' experiences.</p>
 
             <h2>How It Works</h2>
             <p>The system uses two BS2 microcontrollers working in tandem over Bluetooth. The first (portable) unit is worn in the user's pocket and continuously monitors motion via a Memsic 2125 dual-axis accelerometer. The second (stationary) unit is wired into the electric stove via a Solid State Relay (SSR).</p>
             <p>When a fall is detected, the system initiates a 20-second countdown before taking action, giving the user time to press a soft-reset button if the fall was minor. A buzzer sounds with 10 seconds remaining as a final warning. If no cancellation is received, the portable BS2 sends a signal over Bluetooth to the user's phone, which captures GPS coordinates and automatically texts the emergency contact with the user's location and address. Simultaneously, the phone relays a command to the stationary BS2, which triggers the SSR to cut power to the stove. A green LED confirms the stove has been shut off.</p>
-            <p>A second button acts as a kill switch — pressing it immediately halts all code execution, preventing repeated false alerts in case of malfunction.</p>
+            <p>A second button acts as a kill switch â pressing it immediately halts all code execution, preventing repeated false alerts in case of malfunction.</p>
 
             <h2>Fall Detection Logic</h2>
             <p>The accelerometer outputs pulse-width signals on its X and Y axes. At startup, calibration values (xCal, yCal) are recorded and scaled down by a factor of 10 to filter noise. During operation, the absolute deviation from these baseline values is computed continuously:</p>
             <ul>
-                <li>xDiff = |xMove − xCal|</li>
-                <li>yDiff = |yMove − yCal|</li>
+                <li>xDiff = |xMove â xCal|</li>
+                <li>yDiff = |yMove â yCal|</li>
             </ul>
             <p>If either xDiff or yDiff exceeds the predefined motion thresholds (XLimit = YLimit = 58), the system classifies the event as a fall and triggers the alarm sequence.</p>
 
             <h2>Key Components</h2>
             <ul>
-                <li><strong>BS2 Microcontrollers (×2)</strong> – one portable (fall detection), one stationary (stove control).</li>
-                <li><strong>Memsic 2125 Accelerometer</strong> – digital dual-axis sensor for real-time fall detection.</li>
-                <li><strong>RN-42 Bluetooth Modules (×2)</strong> – wireless communication between the two BS2 boards and the user's phone.</li>
-                <li><strong>Solid State Relay (SSR)</strong> – safely interrupts power to the electric stove (handles up to 15A with electrical isolation).</li>
-                <li><strong>Buzzer, LEDs, Push Buttons</strong> – audible/visual user feedback and manual override controls.</li>
-                <li><strong>External Power Supply</strong> – protects the BS2 from overload (BS2 limited to 40mA per 8 pins).</li>
+                <li><strong>BS2 Microcontrollers (Ã2)</strong> â one portable (fall detection), one stationary (stove control).</li>
+                <li><strong>Memsic 2125 Accelerometer</strong> â digital dual-axis sensor for real-time fall detection.</li>
+                <li><strong>RN-42 Bluetooth Modules (Ã2)</strong> â wireless communication between the two BS2 boards and the user's phone.</li>
+                <li><strong>Solid State Relay (SSR)</strong> â safely interrupts power to the electric stove (handles up to 15A with electrical isolation).</li>
+                <li><strong>Buzzer, LEDs, Push Buttons</strong> â audible/visual user feedback and manual override controls.</li>
+                <li><strong>External Power Supply</strong> â protects the BS2 from overload (BS2 limited to 40mA per 8 pins).</li>
             </ul>
 
             <h2>Results</h2>
             <p>All primary objectives were successfully demonstrated: fall detection worked accurately across a range of motions, Bluetooth communication between both microcontrollers and the phone was stable, GPS location was correctly captured and texted to the emergency contact, and the SSR reliably cut power to the stove upon receiving the shutdown signal. The team carefully rewired a portable stovetop handling up to 15 amps, approaching the high-voltage work with rigorous safety practices.</p>
 
             <h2>Cost &amp; Scalability</h2>
-            <p>Prototype cost: ~$404 (using Parallax components). With cheaper components and a conservative 10% bulk discount for mass production, the projected cost drops to ~$96.54 — a reduction of over 75% — making the system genuinely viable as a commercial product.</p>
+            <p>Prototype cost: ~$404 (using Parallax components). With cheaper components and a conservative 10% bulk discount for mass production, the projected cost drops to ~$96.54 â a reduction of over 75% â making the system genuinely viable as a commercial product.</p>
 
             <h2>Advantages</h2>
             <ul>
@@ -57,7 +62,7 @@
             <h2>Limitations &amp; Future Work</h2>
             <ul>
                 <li>Occasional false positives from the accelerometer (mitigated by the 30-second cancel window).</li>
-                <li>Prototype is bulky — future versions would miniaturise components into a compact wearable.</li>
+                <li>Prototype is bulky â future versions would miniaturise components into a compact wearable.</li>
                 <li>High prototype cost, though mass production cost analysis shows strong affordability potential.</li>
             </ul>
         </section>
@@ -65,6 +70,6 @@
     <footer>
         <p>&copy; 2026 <span class="personal-name">Loading...</span>. All rights reserved.</p>
     </footer>
-    <script src="../script.js"></script>
+    <script src="../../script.js"></script>
 </body>
 </html>

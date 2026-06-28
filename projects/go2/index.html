@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go2 RL Locomotion – Unitree Quadruped in Isaac Lab</title>
+    <link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+    <header>
+        <h1>Go2 RL Locomotion – Training a Unitree Quadruped to Walk in Isaac Lab</h1>
+    </header>
+    <main>
+        <a class="back-home" href="../../index.html">← Back to portfolio</a>
+        <section>
+            <video class="project-video" controls autoplay muted loop playsinline preload="auto">
+                <source src="demo.mp4" type="video/mp4">
+                Your browser does not support the video tag. <a href="demo.mp4">Download the video</a>.
+            </video>
+            <p><strong>Course:</strong> ROB-GY 6323 — Reinforcement Learning &amp; Optimal Control, NYU Tandon | <strong>Lab:</strong> Machines in Motion</p>
+            <p>
+                <a href="https://github.com/rajpcrj/rob6323_go2_project" target="_blank">View Code on GitHub →</a>
+            </p>
+
+            <h2>Overview</h2>
+            <p>This project trains a <strong>Unitree Go2</strong> quadruped robot to walk using <strong>deep reinforcement learning</strong> inside <strong>NVIDIA Isaac Lab</strong>. Starting from a minimal baseline policy, the goal is to take a robot that barely tracks a commanded velocity and turn it into a stable, robust walker through principled reward shaping and domain randomization — then validate the learned policy in simulation. Training runs on NYU's <strong>Greene HPC cluster</strong> using GPU-accelerated parallel environments.</p>
+
+            <h2>Approach</h2>
+            <p>The policy is trained with <strong>Proximal Policy Optimization (PPO)</strong> via the <code>rsl_rl</code> framework. Thousands of Go2 environments are simulated in parallel on the GPU, letting the agent collect millions of timesteps of experience quickly. The core engineering work lives in the task environment definition — the observation space, action space, and reward function that shape how the robot learns to move.</p>
+
+            <h2>Reward Shaping</h2>
+            <p>A naive velocity-tracking reward produces a robot that lurches and falls. To get principled, natural locomotion, the reward function combines multiple terms:</p>
+            <ul>
+                <li><strong>Velocity tracking</strong> – follow the commanded linear and angular velocity.</li>
+                <li><strong>Posture stabilization</strong> – keep the base upright and at a target height.</li>
+                <li><strong>Foot clearance</strong> – lift feet adequately during swing to avoid stumbling.</li>
+                <li><strong>Slip minimization</strong> – penalize feet sliding while in contact with the ground.</li>
+                <li><strong>Smooth actions</strong> – penalize jerky torque changes for energy efficiency and sim-to-real transfer.</li>
+                <li><strong>Contact &amp; collision penalties</strong> – discourage undesired body-ground contact.</li>
+            </ul>
+
+            <h2>Robustness via Domain Randomization</h2>
+            <p>To produce a policy that doesn't overfit to the perfect physics of the simulator, training randomizes physical parameters — masses, friction coefficients, and external disturbances (random pushes). This forces the agent to learn a controller that recovers from perturbations, a key step toward sim-to-real deployment on real hardware.</p>
+
+            <h2>Tech Stack</h2>
+            <ul>
+                <li><strong>NVIDIA Isaac Lab / Isaac Sim</strong> – GPU-accelerated robotics simulation.</li>
+                <li><strong>PPO (rsl_rl)</strong> – on-policy deep RL algorithm.</li>
+                <li><strong>Python</strong> – environment, reward, and configuration code (~59k lines).</li>
+                <li><strong>SLURM on NYU Greene HPC</strong> – distributed training via burst compute, job scheduling, and checkpointing.</li>
+                <li><strong>TensorBoard</strong> – tracking reward curves, losses, and episode lengths.</li>
+            </ul>
+
+            <h2>Workflow</h2>
+            <p>The pipeline is fully cluster-based: an installer sets up Isaac Lab in Greene storage, training jobs are submitted with <code>./train.sh</code> through SLURM on burst compute nodes, and each run produces TensorBoard logs, model checkpoints (<code>model_[epoch].pt</code>), the exact PPO/environment config as YAML, and a rollout video showcasing the trained gait. Results are synced back locally with <code>rsync</code> for analysis.</p>
+
+            <h2>Outcome</h2>
+            <p>The deliverable is a trained Go2 walking policy that goes beyond raw velocity tracking — demonstrating stable posture, natural foot placement, and robustness to disturbances — together with benchmarking metrics and a short demo video of the policy in action.</p>
+        </section>
+    </main>
+    <footer>
+        <p>&copy; 2026 <span class="personal-name">Loading...</span>. All rights reserved.</p>
+    </footer>
+    <script src="../../script.js"></script>
+</body>
+</html>
