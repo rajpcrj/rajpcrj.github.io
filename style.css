@@ -211,6 +211,66 @@ li::marker { color: var(--cyan); }
   font-size: 0.95rem;
 }
 
+/* ---- Skills / Tech Stack --------------------------------------- */
+.skill-group { margin-bottom: 1.4em; }
+.skill-group:last-child { margin-bottom: 0; }
+.skill-group h3 {
+  color: var(--txt-bright);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin: 0 0 0.7em;
+}
+.skill-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6em;
+  padding: 0;
+  list-style: none;
+}
+.skill-tags li {
+  margin: 0;
+  padding: 0.4em 0.9em;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  color: var(--txt);
+  background: rgba(0, 234, 255, 0.06);
+  border: 1px solid var(--panel-brd);
+  border-radius: 999px;
+  transition: color 0.2s, border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+.skill-tags li:hover {
+  color: var(--txt-bright);
+  background: rgba(157, 107, 255, 0.12);
+  border-color: var(--cyan);
+  box-shadow: var(--glow-cyan);
+}
+.skill-tags li::marker { content: none; }
+
+/* ---- Per-card tech details ------------------------------------- */
+.project-tech {
+  margin: 0.9em 0 0;
+  padding-top: 0.9em;
+  border-top: 1px dashed var(--panel-brd);
+}
+.project-tech .tech-row {
+  display: flex;
+  gap: 0.5em;
+  margin: 0.45em 0;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+.project-tech .tech-label {
+  flex: 0 0 auto;
+  color: var(--cyan);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  min-width: 72px;
+}
+.project-tech .tech-val { color: var(--txt-dim); }
+
 /* ---- Projects grid --------------------------------------------- */
 .projects {
   display: grid;

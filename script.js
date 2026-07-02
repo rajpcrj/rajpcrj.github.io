@@ -117,9 +117,9 @@ const PROJECT_ORDER = {
   go2:            1,
   space_robotics: 2,
   shm_fanout:     3,
-  home_safety_fall_detection_smart_stove_control: 3,
-  sprout:         3,
-  breez_bipap_ventilator: 3
+  sprout:         4,
+  home_safety_fall_detection_smart_stove_control: 5,
+  breez_bipap_ventilator: 6
 };
 
 // Reorder the homepage cards by an {id: order} map, then (re)apply the
