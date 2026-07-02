@@ -14,48 +14,100 @@
         <a class="back-home" href="../../index.html">← Back to portfolio</a>
         <section>
             <video class="project-video" controls autoplay muted loop playsinline preload="auto">
-                <source src="demo.mp4" type="video/mp4">
-                Your browser does not support the video tag. <a href="demo.mp4">Download the video</a>.
+                <source src="run_133736_randomized.mp4" type="video/mp4">
+                Your browser does not support the video tag. <a href="run_133736_randomized.mp4">Download the video</a>.
             </video>
-            <p><strong>Course:</strong> ROB-GY 6323 — Reinforcement Learning &amp; Optimal Control, NYU Tandon | <strong>Lab:</strong> Machines in Motion</p>
+            <p><strong>Course:</strong> ROB-GY 6323 — Reinforcement Learning &amp; Optimal Control, NYU Tandon | <strong>Reference lab:</strong> Machines in Motion</p>
             <p>
                 <a href="https://github.com/rajpcrj/rob6323_go2_project" target="_blank">View Code on GitHub →</a>
             </p>
 
             <h2>Overview</h2>
-            <p>This project trains a <strong>Unitree Go2</strong> quadruped robot to walk using <strong>deep reinforcement learning</strong> inside <strong>NVIDIA Isaac Lab</strong>. Starting from a minimal baseline policy, the goal is to take a robot that barely tracks a commanded velocity and turn it into a stable, robust walker through principled reward shaping and domain randomization — then validate the learned policy in simulation. Training runs on NYU's <strong>Greene HPC cluster</strong> using GPU-accelerated parallel environments.</p>
+            <p>This project trains a <strong>Unitree Go2</strong> quadruped to walk on command using <strong>deep reinforcement learning</strong> inside <strong>NVIDIA Isaac Lab</strong>. Starting from a minimal <code>DirectRLEnv</code> baseline that barely tracks a velocity command, the work turns it into a stable, natural-gaited walker through a custom torque-level controller, a ten-term shaped reward, and a gait-clock formulation — then validates the policy in simulation. Training runs across <strong>4096 GPU-parallel environments</strong> on NYU's <strong>Greene HPC cluster</strong> via SLURM burst compute.</p>
 
-            <h2>Approach</h2>
-            <p>The policy is trained with <strong>Proximal Policy Optimization (PPO)</strong> via the <code>rsl_rl</code> framework. Thousands of Go2 environments are simulated in parallel on the GPU, letting the agent collect millions of timesteps of experience quickly. The core engineering work lives in the task environment definition — the observation space, action space, and reward function that shape how the robot learns to move.</p>
+            <div class="callout win">
+                <p><strong>What was actually built:</strong> a from-scratch PD torque controller, action-rate (1st + 2nd derivative) smoothing, a Raibert-heuristic foot-placement reward driven by a von-Mises gait clock, foot-clearance and contact-force shaping from the contact sensor, posture/orientation penalties, and early-termination criteria — all layered onto velocity tracking.</p>
+            </div>
 
-            <h2>Reward Shaping</h2>
-            <p>A naive velocity-tracking reward produces a robot that lurches and falls. To get principled, natural locomotion, the reward function combines multiple terms:</p>
+            <h2>The control loop</h2>
+            <p>Rather than letting the physics engine's implicit PD controller drive the joints, the environment disables it (<code>stiffness=0, damping=0</code>) and implements its own <strong>torque-level PD controller</strong>. The policy outputs joint-position offsets; these become desired positions, and torques are computed and clipped each physics step:</p>
+            <pre><code>desired_joint_pos = action_scale * action + default_joint_pos
+torques = clip(Kp * (desired_joint_pos - joint_pos) - Kd * joint_vel,
+               -torque_limit, +torque_limit)
+robot.set_joint_effort_target(torques)</code></pre>
+            <p>Gains: <code>Kp = 20.0</code>, <code>Kd = 0.5</code>, torque clip <code>±100 N·m</code>, action scale <code>0.25</code>. The sim steps at <strong>200 Hz</strong> with a control decimation of 4 (policy at 50 Hz).</p>
+
+            <h2>Reward shaping (10 terms)</h2>
+            <p>A naive velocity-tracking reward produces a robot that lurches and falls. The reward function combines ten terms — two positive tracking rewards and eight shaping penalties — each implemented against <code>robot.data</code> and the contact sensor:</p>
+            <table class="cmp">
+                <thead><tr><th>Reward term</th><th>Scale</th><th>What it does</th></tr></thead>
+                <tbody>
+                    <tr><td>track_lin_vel_xy_exp</td><td>+1.0</td><td>exp(−err/0.25) on commanded XY linear velocity</td></tr>
+                    <tr><td>track_ang_vel_z_exp</td><td>+0.5</td><td>exp(−err/0.25) on commanded yaw rate</td></tr>
+                    <tr><td>raibert_heuristic</td><td>−10.0</td><td>foot placement vs. Raibert target in body frame</td></tr>
+                    <tr><td>feet_clearance</td><td>−30.0</td><td>swing-phase foot height vs. 8 cm clearance target</td></tr>
+                    <tr><td>tracking_contacts_shaped_force</td><td>+4.0</td><td>penalize contact force when a foot should be in swing</td></tr>
+                    <tr><td>orient</td><td>−5.0</td><td>keep base flat (projected gravity XY → 0)</td></tr>
+                    <tr><td>rew_action_rate</td><td>−0.1</td><td>1st + 2nd derivative of actions (anti-jerk)</td></tr>
+                    <tr><td>lin_vel_z</td><td>−0.02</td><td>penalize vertical bounce</td></tr>
+                    <tr><td>ang_vel_xy</td><td>−0.001</td><td>penalize roll/pitch rate</td></tr>
+                    <tr><td>dof_vel</td><td>−0.0001</td><td>penalize high joint velocities</td></tr>
+                </tbody>
+            </table>
+
+            <h2>Gait clock &amp; the Raibert heuristic</h2>
+            <p>A gait clock advances at <strong>3 Hz</strong> with a trot phase offset of 0.5 between diagonal foot pairs. Four <code>clock_inputs</code> (sines of the per-foot phases) are fed into the policy observation so it can anticipate the gait. A <strong>von-Mises smoothing</strong> (κ = 0.07) turns the discrete stance/swing schedule into smooth <code>desired_contact_states</code>, which drive both the foot-clearance and contact-force rewards. The <strong>Raibert heuristic</strong> computes where each foot <em>should</em> land — from a nominal stance (width 0.25 m, length 0.45 m) plus velocity-dependent offsets — and penalizes the squared error against the actual footstep positions transformed into the body frame.</p>
+
+            <h2>Observations, actions &amp; terminations</h2>
             <ul>
-                <li><strong>Velocity tracking</strong> – follow the commanded linear and angular velocity.</li>
-                <li><strong>Posture stabilization</strong> – keep the base upright and at a target height.</li>
-                <li><strong>Foot clearance</strong> – lift feet adequately during swing to avoid stumbling.</li>
-                <li><strong>Slip minimization</strong> – penalize feet sliding while in contact with the ground.</li>
-                <li><strong>Smooth actions</strong> – penalize jerky torque changes for energy efficiency and sim-to-real transfer.</li>
-                <li><strong>Contact &amp; collision penalties</strong> – discourage undesired body-ground contact.</li>
+                <li><strong>Observation (52-D):</strong> base linear &amp; angular velocity, projected gravity, the 3-D velocity command, joint positions (relative to default), joint velocities, last actions, and the 4 gait-clock inputs.</li>
+                <li><strong>Action (12-D):</strong> joint-position offsets for the 12 leg joints (hip / thigh / calf × 4).</li>
+                <li><strong>Early termination:</strong> base contact force &gt; 1 N, robot flipped upside-down (projected gravity z &gt; 0), or base height &lt; 0.20 m — episodes end early so the policy quickly learns to stay up. Episodes otherwise run 20 s.</li>
+                <li><strong>Commands:</strong> resampled uniformly in [−1, 1] for vx, vy, and yaw rate on each reset.</li>
             </ul>
 
-            <h2>Robustness via Domain Randomization</h2>
-            <p>To produce a policy that doesn't overfit to the perfect physics of the simulator, training randomizes physical parameters — masses, friction coefficients, and external disturbances (random pushes). This forces the agent to learn a controller that recovers from perturbations, a key step toward sim-to-real deployment on real hardware.</p>
+            <h2>Training (PPO / rsl_rl)</h2>
+            <p>The policy is trained with <strong>PPO</strong> via the <code>rsl_rl</code> framework: an actor-critic MLP (hidden dims <code>[256, 128, 64]</code>, ELU, with observation normalization), 32 steps per env across 4096 envs, 5 learning epochs / 4 minibatches per update, learning rate 3e-4 with an adaptive KL schedule (target KL 0.008), γ = 0.99, λ = 0.95, clip 0.2, for up to <strong>500 iterations</strong>. Each run emits TensorBoard scalars, <code>model_[epoch].pt</code> checkpoints, the exact config as YAML, and a rollout video.</p>
 
-            <h2>Tech Stack</h2>
+            <h2>Results — policy rollouts</h2>
+            <p>These are the actual <code>play</code> rollout videos from the saved training runs (the “good logs”), ordered to show the progression from baseline to the randomization experiments. Each clip shows the trained policy following commanded velocities on flat ground.</p>
+
+            <figure class="fig">
+                <video class="project-video" controls muted loop playsinline preload="metadata">
+                    <source src="run_133345_baseline.mp4" type="video/mp4">
+                </video>
+                <figcaption>Run 133345 — baseline policy, before torque/friction randomization (Dec 15).</figcaption>
+            </figure>
+
+            <figure class="fig">
+                <video class="project-video" controls muted loop playsinline preload="metadata">
+                    <source src="run_133736_randomized.mp4" type="video/mp4">
+                </video>
+                <figcaption>Run 133736 — after adding torque &amp; friction randomization; visibly steadier gait (Dec 15).</figcaption>
+            </figure>
+
+            <figure class="fig">
+                <video class="project-video" controls muted loop playsinline preload="metadata">
+                    <source src="run_134475_refined.mp4" type="video/mp4">
+                </video>
+                <figcaption>Run 134475 — a later refined run with cleaner, more consistent stepping (Dec 18).</figcaption>
+            </figure>
+
+            <h2>Robustness experiments</h2>
+            <p>Across runs, <strong>torque and friction randomization</strong> was introduced to push the policy toward a controller that doesn't overfit to the simulator's perfect physics — a step toward sim-to-real transfer. The before/after pair above (133345 → 133736) shows the effect directly, with the later refined run (134475) producing the cleanest, most consistent stepping.</p>
+
+            <h2>Tech stack</h2>
             <ul>
-                <li><strong>NVIDIA Isaac Lab / Isaac Sim</strong> – GPU-accelerated robotics simulation.</li>
-                <li><strong>PPO (rsl_rl)</strong> – on-policy deep RL algorithm.</li>
-                <li><strong>Python</strong> – environment, reward, and configuration code (~59k lines).</li>
-                <li><strong>SLURM on NYU Greene HPC</strong> – distributed training via burst compute, job scheduling, and checkpointing.</li>
-                <li><strong>TensorBoard</strong> – tracking reward curves, losses, and episode lengths.</li>
+                <li><strong>NVIDIA Isaac Lab / Isaac Sim</strong> — GPU-accelerated robotics simulation (<code>DirectRLEnv</code>, 4096 parallel envs).</li>
+                <li><strong>PPO (rsl_rl)</strong> — on-policy deep RL with an actor-critic MLP.</li>
+                <li><strong>PyTorch</strong> — all reward, gait-clock, and controller math, fully vectorized across environments.</li>
+                <li><strong>Contact sensor</strong> — per-foot net contact forces for the force-tracking and termination logic.</li>
+                <li><strong>SLURM on NYU Greene HPC</strong> — burst compute, job scheduling, and checkpointing.</li>
+                <li><strong>TensorBoard</strong> — reward-curve, loss, and episode-length tracking per run.</li>
             </ul>
-
-            <h2>Workflow</h2>
-            <p>The pipeline is fully cluster-based: an installer sets up Isaac Lab in Greene storage, training jobs are submitted with <code>./train.sh</code> through SLURM on burst compute nodes, and each run produces TensorBoard logs, model checkpoints (<code>model_[epoch].pt</code>), the exact PPO/environment config as YAML, and a rollout video showcasing the trained gait. Results are synced back locally with <code>rsync</code> for analysis.</p>
 
             <h2>Outcome</h2>
-            <p>The deliverable is a trained Go2 walking policy that goes beyond raw velocity tracking — demonstrating stable posture, natural foot placement, and robustness to disturbances — together with benchmarking metrics and a short demo video of the policy in action.</p>
+            <p>The deliverable is a trained Go2 walking policy that goes well beyond raw velocity tracking — a torque-controlled, gait-clocked walker with shaped foot placement, posture stabilization, and smooth actions — together with a set of benchmarked training runs and the rollout videos above demonstrating the learned gait.</p>
         </section>
     </main>
     <footer>

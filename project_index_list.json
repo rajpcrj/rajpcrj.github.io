@@ -1,0 +1,11 @@
+{
+  "_comment": "Set the 'order' number for each project to control card order on the homepage. Lower number = shown first. Projects sharing the same number are sorted alphabetically by title. The 'id' must match the project folder name under projects/.",
+  "projects": [
+    { "id": "go2",            "order": 1, "title": "Go2 RL Locomotion – Training a Unitree Quadruped to Walk in Isaac Lab" },
+    { "id": "space_robotics", "order": 2, "title": "Satellite Constellation Design for Space-Based Wireless Power Transfer" },
+    { "id": "shm_fanout",     "order": 3, "title": "ros2_shm_fanout – A Shared-Memory Transport for High-Fan-Out Perception" },
+    { "id": "home_safety_fall_detection_smart_stove_control", "order": 3, "title": "Home Safety System – Fall Detection & Smart Stove Control" },
+    { "id": "sprout",         "order": 3, "title": "Sprout – Autonomous Greenhouse Plant Care System" },
+    { "id": "breez_bipap_ventilator", "order": 3, "title": "Breez – BiPAP Non-Invasive Ventilator with Sensor Fusion & BLE Telemetry" }
+  ]
+}

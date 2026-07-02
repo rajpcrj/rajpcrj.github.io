@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Satellite Constellation Design for Wireless Power Transfer</title>
+    <link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+    <header>
+        <h1>Satellite Constellation Design for Space-Based Wireless Power Transfer</h1>
+    </header>
+    <main>
+        <a class="back-home" href="../../index.html">← Back to portfolio</a>
+
+        <section>
+            <p><strong>Space Robotics · Orbital Mechanics · GPU Simulation · Optimization</strong> · Python · PyTorch (CUDA) · PuLP/CBC · OpenCV · scikit-learn · NVIDIA Isaac Sim / USD</p>
+            <p><strong>Course:</strong> ROB-GY 7863 — Space Robotics, NYU Tandon</p>
+
+            <video class="project-video" controls autoplay muted loop playsinline preload="auto" poster="graphs/routing_isaac_sim.png">
+                <source src="demo.mp4" type="video/mp4">
+                Your browser does not support the video tag. <a href="demo.mp4">Download the video</a>.
+            </video>
+            <p style="text-align:center; font-family: var(--mono); font-size:0.85rem; color: var(--txt-dim);">// Live Isaac Sim demo — red satellite cuboids in their orbital rings, blue rectennas studding the Earth, green power beams streaming down to the ground stations.</p>
+
+            <div class="stats">
+                <div class="stat"><span class="num">1183</span><span class="lbl">candidate orbital configs</span></div>
+                <div class="stat"><span class="num">50</span><span class="lbl">ground rectennas placed</span></div>
+                <div class="stat"><span class="num">10k</span><span class="lbl">inclination×RAAN grid</span></div>
+                <div class="stat"><span class="num">MILP</span><span class="lbl">min-satellite coverage solve</span></div>
+            </div>
+
+            <!-- ===================== INDEX ===================== -->
+            <nav class="toc">
+                <h2>Index</h2>
+                <ol>
+                    <li><a href="#what">What this project is</a></li>
+                    <li><a href="#pipeline">The pipeline end-to-end</a></li>
+                    <li><a href="#dynamics">Spacecraft dynamics (first principles)</a></li>
+                    <li><a href="#placement">Where the rectennas go (computer vision)</a></li>
+                    <li><a href="#orbits">Orbits &amp; GPU visibility</a></li>
+                    <li><a href="#milp">Choosing the constellation (MILP)</a></li>
+                    <li><a href="#routing">Routing &amp; the Isaac Sim frontend</a></li>
+                    <li><a href="#stack">Tech stack &amp; scope</a></li>
+                </ol>
+            </nav>
+        </section>
+
+        <!-- ===================== 1. WHAT ===================== -->
+        <section>
+            <h2 id="what">1 · What This Project Is</h2>
+            <p>This is a complete, multi-stage pipeline for <strong>designing a satellite constellation that beams power down to ground stations</strong> called <strong>rectennas</strong> (rectifying antennas). The question it answers is concrete: <em>where do you place the ground stations, which orbits do you fly, and what is the fewest number of satellites that still keeps every station powered?</em></p>
+            <p>Answering that means stitching together orbital mechanics, GPU-accelerated simulation, mixed-integer optimization, a bit of computer vision, and a 3-D visualization — each stage feeding the next. The two tracks that make it up are <strong>(1)</strong> first-principles spacecraft dynamics and an orbital-geometry parametrization, and <strong>(2)</strong> the wireless-power-transfer study built on top of it: orbit propagation, satellite-to-rectenna visibility, constellation optimization, and animated power beams in NVIDIA Isaac Sim.</p>
+
+            <div class="callout">
+                <p><strong>Scope note:</strong> the whole system runs in simulation — orbital propagation, a visibility model, and an optimizer, visualized in Isaac Sim. It is a constellation-<em>design</em> study, not flight software.</p>
+            </div>
+        </section>
+
+        <!-- ===================== 2. PIPELINE ===================== -->
+        <section>
+            <h2 id="pipeline">2 · The Pipeline End-to-End</h2>
+            <p>Each stage produces an artifact that the next stage consumes — Earth map → rectenna coordinates → orbit grid → visibility tensor → optimized satellite set → routed beams.</p>
+            <pre><code>Earth map ──► rectenna placement (CV) ──► 50 rectenna lat/lon
+                                                │
+              orbit grid (inclination × RAAN)  │
+                        │                       │
+                        ▼                       ▼
+              GPU visibility simulation (PyTorch / CUDA)
+                        │
+                        ▼
+              MILP constellation selection (PuLP / CBC)
+                        │
+                        ▼
+              multi-hop routing  ──►  Isaac Sim USD visualization</code></pre>
+        </section>
+
+        <!-- ===================== 3. DYNAMICS ===================== -->
+        <section>
+            <h2 id="dynamics">3 · Spacecraft Dynamics, From First Principles</h2>
+            <p>Underneath the constellation work sits a full <strong>12-degree-of-freedom rigid-body spacecraft model</strong>, written from scratch in two independent formulations so each could check the other:</p>
+            <ul>
+                <li><strong>Newton–Euler</strong> — translational + rotational equations of motion, including the gyroscopic term <code>−ω×(Iω)</code>, integrated in body-frame angular velocity.</li>
+                <li><strong>Lagrangian</strong> — the same system in Euler-rate coordinates with a generalized inertia <code>J = BᵀIB</code> and Coriolis/centrifugal coupling.</li>
+            </ul>
+            <p>Both were <strong>cross-validated against an independent MuJoCo integration</strong> of the same system — a third-party check on the hand-derived dynamics. The model is nondimensionalized (characteristic length/time/velocity scales) so the integration stays well-conditioned at orbital magnitudes. Representative parameters: spacecraft mass 1600 kg, inertia diag(7429, 7429, 4608) kg·m², <code>dt = 0.05 s</code>, ~76,800 timesteps, initial radius ≈ 6371 km at ≈ 7.67 km/s.</p>
+
+            <p>Each satellite's world position is then composed from three rotation matrices — one per classical orbital element — the <strong>"Super-R matrix"</strong>:</p>
+            <pre><code>R = R_raan(Ω) · R_true_anomaly(ν) · R_inclination(i)
+position_world = R · position_base</code></pre>
+            <p>and a hierarchical class structure (<code>fullConstellation → inclinedConstellations → raacConstellation → EarthTransmissionVehicle</code>) sweeps angle lists to author an entire 3-D constellation as USD prims with physics.</p>
+        </section>
+
+        <!-- ===================== 4. PLACEMENT ===================== -->
+        <section>
+            <h2 id="placement">4 · Where the Rectennas Go — a Computer-Vision Stage</h2>
+            <p>The ground stations can only sit on land, and they should spread out evenly. To get 50 well-distributed land locations, I ran an Earth land/ocean map through a self-contained image-processing pipeline: averaging blur → grayscale + binary threshold (separating land from ocean) → resize and mask out the polar ice → <strong>K-Means (k=50)</strong> over the land pixels → <strong>Voronoi tessellation</strong> to carve the land into 50 service regions → equirectangular pixel→lat/lon mapping.</p>
+
+            <figure class="fig">
+                <img src="graphs/earth_unsegmented.png" alt="Binarized Earth land/ocean mask — white is land, black is ocean.">
+                <figcaption>Step one: the Earth reduced to a clean land/ocean mask (white = land). This is what the clustering runs on.</figcaption>
+            </figure>
+
+            <figure class="fig">
+                <img src="graphs/earth_segmented.png" alt="Land partitioned into 50 colored Voronoi service regions, each with a white rectenna marker at its center.">
+                <figcaption>Step two: K-Means + Voronoi partition the land into 50 service regions; the white dot in each is the chosen rectenna location. Those 50 lat/lon pairs drive the rest of the pipeline.</figcaption>
+            </figure>
+        </section>
+
+        <!-- ===================== 5. ORBITS ===================== -->
+        <section>
+            <h2 id="orbits">5 · Orbits &amp; GPU Visibility</h2>
+            <p>Satellite orbits are generated analytically from inclination and RAAN: an inclined orbit-plane basis is built (Rodrigues rotation of the polar axis), and positions propagate by Kepler's mean motion <code>ω = √(GM/r³)</code> at a 500 km altitude. Rectennas live in an Earth-fixed (ECEF) frame and co-rotate with the planet (<code>ω_e = 2π/86400</code>).</p>
+            <p>The core simulation asks, for every <strong>(satellite, rectenna, time)</strong> triple, whether the satellite is "visible" to the station via an angle-threshold test. That is a huge grid, so it is <strong>fully vectorized on the GPU with PyTorch/CUDA</strong> and evaluated in time chunks to bound memory — sweeping multi-day windows at second-level steps and producing a boolean <code>visibility_mask</code> of shape <code>(1183, 50, T)</code> plus per-satellite and per-rectenna visibility fractions.</p>
+        </section>
+
+        <!-- ===================== 6. MILP ===================== -->
+        <section>
+            <h2 id="milp">6 · Choosing the Constellation — Mixed-Integer Optimization</h2>
+            <p>Given which orbits can see which stations and how often, the design question becomes an optimization: <strong>pick the fewest orbital configurations such that every rectenna gets enough coverage.</strong> That is a <strong>mixed-integer linear program (MILP)</strong>:</p>
+            <table class="cmp">
+                <thead><tr><th>Element</th><th>Definition</th></tr></thead>
+                <tbody>
+                    <tr><td>Decision vars</td><td>binary x_s ∈ {0,1} over a 100×100 inclination×RAAN grid (10,000 candidates)</td></tr>
+                    <tr><td>Objective</td><td>minimize Σ x_s — the fewest satellites selected</td></tr>
+                    <tr><td>Constraints</td><td>for each rectenna r: Σ_s coverage[s,r]·x_s ≥ threshold[r] (e.g. ≥ 85%)</td></tr>
+                    <tr><td>Solver</td><td>CBC via PuLP (PULP_CBC_CMD), configurable MIP gap / time limit</td></tr>
+                    <tr><td>Verification</td><td>a separate routine re-checks every per-rectenna coverage constraint and reports margins</td></tr>
+                </tbody>
+            </table>
+            <p>The solver chose <strong>1183 orbital configurations</strong> out of the grid. Plotting which (inclination, RAAN) pairs were selected reveals the structure the optimizer found:</p>
+
+            <figure class="fig">
+                <img src="graphs/heatmap_selected_points.png" alt="Heatmap of selected orbits over the theta (inclination) vs RAAN grid — bright horizontal bands at preferred inclinations.">
+                <figcaption>The orbits the MILP selected across the inclination (θ) × RAAN grid. The bright horizontal bands show the optimizer strongly preferring a handful of inclinations — those that sweep the most populated latitude belts — while spreading RAAN broadly for longitude coverage.</figcaption>
+            </figure>
+
+            <figure class="fig">
+                <img src="graphs/theta_histogram.png" alt="Histogram of selected inclination values, clustered around specific bands up to ~76 degrees.">
+                <figcaption>Selected inclinations cluster at specific values (peaks near ~42°, ~62°, ~76°) — the inclinations whose ground tracks best cover where the rectennas actually sit.</figcaption>
+            </figure>
+
+            <figure class="fig">
+                <img src="graphs/raan_histogram.png" alt="Histogram of selected RAAN values, roughly uniform from 0 to 180 degrees.">
+                <figcaption>RAAN, by contrast, is selected nearly uniformly across 0–180° — the constellation needs orbital planes spread all the way around the globe to keep every longitude in view.</figcaption>
+            </figure>
+        </section>
+
+        <!-- ===================== 7. ROUTING ===================== -->
+        <section>
+            <h2 id="routing">7 · Routing &amp; the Isaac Sim Frontend</h2>
+            <p>With the constellation fixed and the time-varying visibility known, the pipeline computes <strong>source-to-rectenna power-delivery paths</strong> over every timestep — a fast vectorized per-timestep selection of the lowest-cost relay through the visible satellite set (<code>cost = ‖S − sat‖ + ‖sat − rect‖</code>), producing a path matrix of 3-D coordinates.</p>
+            <p>The whole thing is then visualized in <strong>NVIDIA Isaac Sim</strong>: pure-USD mesh cuboids for satellites (red), rectennas (blue), and power beams (green), oriented via quaternions and animated together through cooperative <code>asyncio</code> coroutines that yield to the render thread (with frame batching — up to 2000 sats / 500 rects / 200 beam segments per UI tick — so large constellations stay smooth).</p>
+
+            <figure class="fig">
+                <img src="graphs/routing_isaac_sim.png" alt="Isaac Sim viewport: green power beams converging from multiple satellites onto a rectenna region on the white Earth sphere.">
+                <figcaption>The live Isaac Sim view: green multi-hop power beams converging from the satellite constellation down onto the rotating Earth — rendering at ~110 fps on an RTX 4050.</figcaption>
+            </figure>
+        </section>
+
+        <!-- ===================== 8. STACK ===================== -->
+        <section>
+            <h2 id="stack">8 · Tech Stack &amp; Scope</h2>
+            <table class="cmp">
+                <thead><tr><th>Area</th><th>Techniques</th></tr></thead>
+                <tbody>
+                    <tr><td>Orbital mechanics</td><td>Kepler mean motion, inclined-orbit construction, Rodrigues rotation, ECEF/ECI geometry, parametric circular-orbit propagation</td></tr>
+                    <tr><td>Rigid-body dynamics</td><td>Newton–Euler &amp; Lagrangian formulations, gyroscopic coupling, generalized inertia, nondimensionalization, MuJoCo cross-validation</td></tr>
+                    <tr><td>Optimization</td><td>mixed-integer linear programming (PuLP/CBC), binary set-selection under coverage constraints, independent solution verification</td></tr>
+                    <tr><td>GPU computing</td><td>PyTorch/CUDA vectorization, time-chunked memory management, large-grid batch simulation</td></tr>
+                    <tr><td>Computer vision</td><td>filtering, thresholding, K-Means, Voronoi segmentation, geometric coordinate mapping</td></tr>
+                    <tr><td>3-D simulation / viz</td><td>NVIDIA Isaac Sim, USD prim authoring, physics APIs, async animation</td></tr>
+                </tbody>
+            </table>
+            <p>A cross-disciplinary space-robotics pipeline: first-principles spacecraft dynamics (dual-formulation, MuJoCo-validated), GPU-accelerated orbital simulation, mixed-integer constellation optimization with independent verification, a computer-vision ground-segment placement stage, and a 3-D Isaac Sim visualization — implemented end-to-end in Python.</p>
+        </section>
+    </main>
+    <footer>
+        <p>&copy; 2026 <span class="personal-name">Loading...</span>. All rights reserved.</p>
+    </footer>
+    <script src="../../script.js"></script>
+</body>
+</html>

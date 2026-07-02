@@ -33,10 +33,13 @@ function populatePersonal(data) {
 // 1) Populate immediately from embedded data (always works).
 populatePersonal(PERSONAL);
 
-// 2) If served over http(s), try personal.json so external edits override.
-if (location.protocol.startsWith('http')) {
-  const dataURL = location.pathname.includes('/projects/') ? '../personal.json' : 'personal.json';
-  fetch(dataURL)
+// 2) On the HOMEPAGE only, served over http(s), try personal.json so external
+//    edits override. Project pages are self-contained: they render entirely from
+//    the embedded PERSONAL data above and never fetch a shared root file (so no
+//    404s from inside /projects/<name>/).
+const isProjectPage = location.pathname.includes('/projects/');
+if (location.protocol.startsWith('http') && !isProjectPage) {
+  fetch('personal.json')
     .then(r => r.json())
     .then(populatePersonal)
     .catch(() => { /* keep embedded data */ });
@@ -108,18 +111,92 @@ if (location.protocol.startsWith('http')) {
 // ------------------------------------------------------------
 //  Scroll reveal + project hover spotlight
 // ------------------------------------------------------------
-window.addEventListener('DOMContentLoaded', () => {
-  // Auto-number project cards by their position (1, 2, 3, ...)
-  document.querySelectorAll('.projects .project h3').forEach((h3, i) => {
-    h3.textContent = `Project ${i + 1}: ${h3.textContent}`;
+// Default ordering — mirrors project_index_list.json so reordering works on
+// file:// too (where fetch is blocked). Lower 'order' first; ties → A→Z by title.
+const PROJECT_ORDER = {
+  go2:            1,
+  space_robotics: 2,
+  shm_fanout:     3,
+  home_safety_fall_detection_smart_stove_control: 3,
+  sprout:         3,
+  breez_bipap_ventilator: 3
+};
+
+// Reorder the homepage cards by an {id: order} map, then (re)apply the
+// "Project N:" numbering to match the new visual order.
+function applyProjectOrder(orderMap) {
+  const grid = document.querySelector('.projects');
+  if (!grid) return;
+  const cards = Array.from(grid.querySelectorAll('.project'));
+  if (!cards.length) return;
+
+  const baseTitle = (card) => {
+    const h3 = card.querySelector('h3');
+    // strip any existing "Project N: " prefix so sorting/relabel is stable
+    return h3 ? h3.textContent.replace(/^Project\s+\d+:\s*/, '') : '';
+  };
+
+  cards
+    .map((card, i) => ({ card, i, title: baseTitle(card) }))
+    .sort((a, b) => {
+      const oa = orderMap[a.card.dataset.id] ?? 999;
+      const ob = orderMap[b.card.dataset.id] ?? 999;
+      if (oa !== ob) return oa - ob;                 // by manual number
+      const t = a.title.localeCompare(b.title);      // ties: alphabetical
+      return t !== 0 ? t : a.i - b.i;
+    })
+    .forEach(({ card }) => grid.appendChild(card));   // re-insert in new order
+
+  // Renumber after reordering
+  grid.querySelectorAll('.project h3').forEach((h3, i) => {
+    h3.textContent = `Project ${i + 1}: ${baseTitle(h3.closest('.project'))}`;
   });
+}
 
-  document.querySelectorAll('section, .project').forEach(el => el.classList.add('reveal'));
+window.addEventListener('DOMContentLoaded', () => {
+  // 1) Order immediately from embedded defaults (always works, incl. file://).
+  applyProjectOrder(PROJECT_ORDER);
 
-  const io = new IntersectionObserver((entries) => {
-    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); } });
-  }, { threshold: 0.08 });
-  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+  // 2) On the HOMEPAGE only, over http(s), load project_index_list.json so manual
+  //    edits take effect. Project pages have no card grid, so they skip this fetch
+  //    entirely and stay fully self-contained (no 404 for the shared root file).
+  if (location.protocol.startsWith('http') && !location.pathname.includes('/projects/')) {
+    fetch('project_index_list.json')
+      .then(r => r.json())
+      .then(cfg => {
+        const map = {};
+        (cfg.projects || []).forEach(p => { map[p.id] = p.order; });
+        applyProjectOrder(map);
+      })
+      .catch(() => { /* keep embedded order */ });
+  }
+
+  const revealEls = document.querySelectorAll('section, .project');
+  revealEls.forEach(el => el.classList.add('reveal'));
+
+  const showAll = () => revealEls.forEach(el => el.classList.add('visible'));
+
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); } });
+    }, { threshold: 0.08 });
+    revealEls.forEach(el => io.observe(el));
+
+    // Fail-safe: immediately reveal anything already on/near screen at load
+    // (e.g. a project page whose only <section> sits below a tall header and
+    // never scrolls, so the observer would otherwise never fire).
+    requestAnimationFrame(() => {
+      revealEls.forEach(el => {
+        const r = el.getBoundingClientRect();
+        if (r.top < window.innerHeight * 1.25) el.classList.add('visible');
+      });
+    });
+    // Absolute backstop: after 1.2s, reveal everything no matter what.
+    setTimeout(showAll, 1200);
+  } else {
+    // No IntersectionObserver support → just show everything.
+    showAll();
+  }
 
   document.querySelectorAll('.project').forEach(card => {
     card.addEventListener('mousemove', e => {

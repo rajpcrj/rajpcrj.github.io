@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home Safety System – Fall Detection &amp; Smart Stove Control</title>
+    <link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+    <header>
+        <h1>Home Safety System – Fall Detection &amp; Smart Stove Control</h1>
+    </header>
+    <main>
+        <a class="back-home" href="../../index.html">← Back to portfolio</a>
+        <section>
+            <video class="project-video" controls autoplay muted loop playsinline preload="auto">
+                <source src="demo.mp4" type="video/mp4">
+                Your browser does not support the video tag. <a href="demo.mp4">Download the video</a>.
+            </video>
+            <p><em>Full demonstration: fall detection on the wearable unit, the 30-second cancel window with buzzer warning, the automatic SMS with live GPS location, and the stove being cut off through the Solid State Relay.</em></p>
+            <p><strong>Team:</strong> Raj Priyadarshi, Zihao Hu, Morgan Waddington &nbsp;|&nbsp; Mechatronics Final Project, NYU Tandon School of Engineering</p>
+
+            <h2>Overview</h2>
+            <p>Falls are one of the leading causes of injury among elderly people living alone — and an unattended electric stove can turn a fall into a life-threatening event. This project is a two-unit embedded safety system: a <strong>pocket-worn wearable</strong> that detects falls in real time, and a <strong>stationary stove controller</strong> that cuts power to the burner the moment an emergency is confirmed. In between sits the user's phone, which captures GPS coordinates and automatically texts an emergency contact with the user's live location and street address. The user does not have to do anything after a fall — the system escalates on its own, with generous cancel windows to suppress false alarms. The idea was deeply personal, inspired by the team's own grandparents' experiences.</p>
+
+            <h2>System Architecture</h2>
+            <p>Two BASIC Stamp 2 (BS2) microcontrollers cooperate over Bluetooth:</p>
+            <ul>
+                <li><strong>Portable unit (worn in the pocket):</strong> BS2 + Memsic 2125 dual-axis accelerometer + RN-42 Bluetooth module + buzzer, alarm/reset LEDs, and two push buttons (soft-reset and kill switch).</li>
+                <li><strong>Stationary unit (at the stove):</strong> BS2 + RN-42 Bluetooth module + Solid State Relay (SSR) spliced directly into the power line of a rewired electric stovetop drawing up to 15&nbsp;A.</li>
+                <li><strong>The phone as intermediary:</strong> the portable BS2 signals the user's phone over Bluetooth; the phone grabs GPS latitude/longitude, resolves the street address, sends the SMS alert, and relays the shutdown command onward to the stationary unit — which also means the system keeps working when the user steps outside the house.</li>
+            </ul>
+
+            <h2>Fall Detection — How It Actually Works</h2>
+            <p>The Memsic 2125 outputs acceleration as <strong>pulse-width-modulated signals</strong> on its X and Y axes. The BS2 measures each pulse with the PBASIC <code>PULSIN</code> command. At power-on the firmware performs a <strong>self-calibration</strong>: it records baseline pulse widths (xCal, yCal) for the wearer's resting orientation and scales all readings down by a factor of 10 to filter sensor noise and temperature drift.</p>
+            <p>During operation the loop samples both axes every 0.5&nbsp;s and computes the absolute deviation from the calibrated baseline:</p>
+            <ul>
+                <li><code>xDiff = |xMove − xCal|</code></li>
+                <li><code>yDiff = |yMove − yCal|</code></li>
+            </ul>
+            <p>If either deviation exceeds the motion threshold (<code>XLimit = YLimit = 58</code>), the event is classified as a fall and the alarm state machine is entered. Timer-based debouncing distinguishes a genuine fall from a brief spike in the readings.</p>
+
+            <h2>The Alarm Sequence</h2>
+            <ol>
+                <li><strong>0–20 s:</strong> silent countdown. If the wearer recovered, pressing the <strong>soft-reset button</strong> resets the timer and returns to normal monitoring — no alert, stove stays on.</li>
+                <li><strong>20–30 s:</strong> a loud buzzer pulses (Pin 15, 50&nbsp;ms beeps) warning that escalation is imminent; the soft-reset still cancels everything.</li>
+                <li><strong>After 30 s with no response:</strong> the system assumes a real emergency. The portable BS2 transmits the <code>"111111111"</code> emergency frame over Bluetooth via <code>SEROUT</code> with hardware flow control. The phone texts the emergency contact — <em>"Hi Scott, your friend Raj has collapsed at Latitude: 40.694711, Longitude: −73.985795, Address: 5 MetroTech Center…"</em> — and relays the command to the stationary unit.</li>
+                <li><strong>Stove shutdown:</strong> the stationary BS2's listener loop (<code>SERIN</code> with timeout handling) parses the frame; on a '1' it drives <code>OUT12</code> high, tripping the SSR and opening the stove's power circuit. A green LED confirms the stove is off and help is on the way. A '2' frame closes the relay again — remote stove <em>restart</em>, the seed of the smart-home extension.</li>
+                <li><strong>Kill switch:</strong> a second hardware button (IN7) executes the PBASIC <code>END</code> instruction, immediately halting all execution — the mandated instantaneous-shutdown provision against malfunction loops (e.g. repeated false alerts).</li>
+            </ol>
+
+            <h2>Bluetooth Link — Programmed at the Protocol Level</h2>
+            <p>The RN-42 modules were configured entirely from the BS2 firmware, not from a host PC: the stationary unit enters the RN-42's command mode by sending <code>$$$</code>, sets the UART rate with <code>SU,96</code> (9600&nbsp;bps — matching the BS2's <code>CON 84</code> baud constant), issues a direct connection to the portable module's MAC address (<code>C,608A10668575</code>), then exits command mode with <code>---</code> and drops into a data-listening loop. Both links use <strong>RTS/CTS hardware flow control</strong> wired to dedicated BS2 pins, and the messaging protocol is deliberately redundant — 9-character repeated frames (<code>"000000000"</code> heartbeat / <code>"111111111"</code> emergency) so a single corrupted byte cannot trigger or mask a shutdown.</p>
+
+            <h2>Electronics &amp; Circuit Design</h2>
+            <ul>
+                <li><strong>Accelerometer front-end:</strong> Memsic 2125 X/Y outputs fed through series resistors into BS2 pins P8/P9; +5&nbsp;V supply.</li>
+                <li><strong>Buttons:</strong> two active-low push buttons with 1&nbsp;kΩ pull-up / 270&nbsp;Ω series resistor networks for clean digital reads on IN6/IN7.</li>
+                <li><strong>Relay stage:</strong> SSR with flyback diode (1N400x) and indicator LED, switching the stove's mains line through its N.C./Common/N.O. contacts, with a 5&nbsp;A fuse in line. The relay galvanically isolates the 15&nbsp;A stove circuit from the microcontroller and protects it from voltage surges.</li>
+                <li><strong>Power budgeting:</strong> the BS2 can only source ~40&nbsp;mA per 8-pin bank, so an external 7.5&nbsp;VDC 1.6&nbsp;A supply on a separate breadboard powers all high-current loads.</li>
+                <li><strong>High-power rewiring:</strong> the stovetop's power cables were physically cut and the SSR integrated in line — done with meticulous wiring practice, since poor workmanship at 15&nbsp;A is a genuine fire hazard. This was treated as the highest-risk element of the build.</li>
+            </ul>
+
+            <h2>Requirements Coverage (Course "Must-Haves")</h2>
+            <ul>
+                <li><strong>BS2-controlled:</strong> two BS2s coordinating over wireless — one sensing, one actuating.</li>
+                <li><strong>Analog + digital sensor:</strong> the accelerometer (continuous acceleration measurement) and the push buttons (binary input).</li>
+                <li><strong>Actuator with sensory feedback:</strong> the SSR only trips in response to accelerometer-confirmed fall events; normally-closed so the stove works untouched in daily use.</li>
+                <li><strong>Instantaneous shutdown:</strong> the hardware kill switch (<code>END</code>).</li>
+                <li><strong>User interface:</strong> soft-reset cancel window, buzzer countdown warning, status LEDs, and SMS notifications with live location.</li>
+            </ul>
+
+            <h2>Results</h2>
+            <p>All primary objectives were demonstrated end-to-end: the calibrated thresholds accurately identified fall motions while the timing logic filtered out brief spikes and minor recoverable falls; the Bluetooth links — which prior student teams had struggled to stabilize — paired and streamed reliably; GPS capture and SMS delivery worked through the phone intermediary; and the SSR dependably cut stove power on command. The team went beyond the base requirement by adding the phone-based GPS/address pipeline, the dual-button (soft-reset + kill) interface, and the buzzer countdown.</p>
+
+            <h2>Cost &amp; Path to Production</h2>
+            <p>Prototype BOM: ~<strong>$404</strong> (2× Board of Education BS2 kits $198, 2× RN-42 Bluetooth $120, Memsic 2125 $15, SSR $28, breadboard kit $13, 2× 7.5&nbsp;V supplies $30) — Parallax parts chosen for guaranteed BS2 compatibility. A mass-production analysis substituting Arduino Uno R3, a Grove 3-axis digital accelerometer, HM-10 BLE modules, and a $1.17 SSR, with a conservative 10% bulk discount, cuts the cost to <strong>$96.54</strong> (~$107 including a stovetop) — a &gt;75% reduction that makes the device commercially plausible.</p>
+
+            <h2>Technical Skills Demonstrated</h2>
+            <ul>
+                <li><strong>Embedded firmware:</strong> PBASIC 2.5 on BASIC Stamp 2 — <code>PULSIN</code> pulse-width sensing, <code>SEROUT</code>/<code>SERIN</code> serial I/O with timeouts, state-machine alarm logic, sensor self-calibration, timer-based debouncing.</li>
+                <li><strong>Wireless protocol work:</strong> RN-42 Bluetooth AT-command configuration from firmware (command mode, baud setup, direct MAC connection), RTS/CTS hardware flow control, design of a fault-tolerant redundant message protocol.</li>
+                <li><strong>Distributed embedded systems:</strong> two microcontrollers + a phone intermediary coordinating sensing, alerting, and actuation across three devices.</li>
+                <li><strong>Power electronics &amp; safety:</strong> SSR selection and integration, rewiring a 15&nbsp;A mains appliance, galvanic isolation, fusing, flyback protection, external supply design around the BS2's 40&nbsp;mA/bank limit.</li>
+                <li><strong>Analog/digital circuit design:</strong> accelerometer signal conditioning, pull-up/pull-down button networks, LED and buzzer driver stages.</li>
+                <li><strong>Signal processing:</strong> noise filtering by scaling, baseline-deviation thresholding, false-positive suppression via layered timing windows.</li>
+                <li><strong>Systems &amp; product engineering:</strong> requirements-driven design, failure-mode thinking (kill switch, false-alarm handling, ruggedization plan), bill-of-materials and mass-production cost analysis.</li>
+            </ul>
+
+            <h2>Advantages</h2>
+            <ul>
+                <li><strong>Modular:</strong> the relay side adapts to any appliance — e.g. turning lights <em>on</em> after a fall so the user isn't in the dark.</li>
+                <li><strong>Portable &amp; wireless:</strong> a single pocket wearable covers the whole home and outdoors, versus a costly, privacy-invasive motion-detector-per-room approach that was explicitly evaluated and rejected.</li>
+                <li><strong>Smart-home potential:</strong> the same Bluetooth relay path can remotely switch the stove on — pre-heating before arriving home.</li>
+                <li><strong>Location sharing beyond falls:</strong> the GPS/SMS pipeline doubles as a general safety-location feature.</li>
+            </ul>
+
+            <h2>Limitations &amp; Future Work</h2>
+            <ul>
+                <li>Occasional accelerometer false positives — mitigated by tuned thresholds and the 30-second cancel window, but not eliminated (true of even high-end accelerometers).</li>
+                <li>The prototype is bulky; a production wearable needs miniaturized components in an impact-resistant, padded, water-resistant case.</li>
+                <li>Prototype cost is high, though the production cost analysis shows a clear path below $100.</li>
+            </ul>
+        </section>
+    </main>
+    <footer>
+        <p>&copy; 2026 <span class="personal-name">Loading...</span>. All rights reserved.</p>
+    </footer>
+    <script src="../../script.js"></script>
+</body>
+</html>

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprout — Autonomous Greenhouse Plant Care System</title>
+    <link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+    <header>
+        <h1>Sprout — Autonomous Greenhouse Plant Care System</h1>
+    </header>
+    <main>
+        <a class="back-home" href="../../index.html">← Back to portfolio</a>
+        <section>
+            <video class="project-video" controls loop playsinline preload="auto">
+                <source src="rpi_bot.mp4" type="video/mp4">
+                Your browser does not support the video tag. <a href="rpi_bot.mp4">Download the video</a>.
+            </video>
+            <p><em>The Raspberry Pi camera bot driving up to a plant to capture an image, which is served over the Flask web server with an AI plant-identification and health description.</em></p>
+            <p><strong>Team:</strong> Raj Priyadarshi, Devank Thawre, Sagarika (Rika) Rao Valluri</p>
+            <p><strong>Course:</strong> ROB-GY 6103: Advanced Mechatronics | NYU Tandon School of Engineering | May 2025 | Group 15</p>
+            <p><strong>📄 <a href="Sprout_Full_Report.pdf" target="_blank">Download the full project report (PDF)</a></strong> — narrative, circuit schematic, code, and figures.</p>
+
+            <h2>Demonstration Videos</h2>
+            <div class="media-stack">
+                <figure>
+                    <video controls loop playsinline preload="metadata">
+                        <source src="overview.mp4" type="video/mp4">
+                    </video>
+                    <figcaption>Overview of the instrumented 3×2 plant bed and the mobile bots.</figcaption>
+                </figure>
+                <figure>
+                    <video controls loop playsinline preload="metadata">
+                        <source src="capacitive_sensor.mp4" type="video/mp4">
+                    </video>
+                    <figcaption>Capacitive soil-moisture sensor readings across the two calibrated soil profiles, live on the serial monitor.</figcaption>
+                </figure>
+                <figure>
+                    <video controls loop playsinline preload="metadata">
+                        <source src="rpi_bot.mp4" type="video/mp4">
+                    </video>
+                    <figcaption>The Raspberry Pi camera bot — it drives up to a plant on demand and captures an image, which is served over the Flask web server with an AI description of the plant and its health.</figcaption>
+                </figure>
+            </div>
+
+            <h2>Overview</h2>
+            <p>Sprout is an autonomous mechatronic system designed to automate the care of greenhouse plants and small gardens. Greenhouse environments require highly customised watering schedules, fertilisation routines, and continuous soil monitoring across different plant species year-round. Sprout addresses this through a multi-bot architecture driven by real-time sensor data, enabling autonomous watering, compost/fertiliser dispensing, and plant health monitoring without human intervention.</p>
+            <div class="media-stack">
+                <figure>
+                    <img src="graphs/methodology.png" alt="Methodology diagram: propeller/drive, sensors and physical components, path algorithm, plant bed (3x3 array), watering/composting, and comm systems.">
+                    <figcaption>System methodology — mobile bots with sensors and servos follow a path algorithm to each plant in the bed, then water/compost it, coordinated over the comm system.</figcaption>
+                </figure>
+            </div>
+
+            <h2>Why Three Bots?</h2>
+            <p>A greenhouse plant needs three fundamentally different kinds of care, and each one demands its own actuator, sensor, and payload. Rather than cram all of that onto a single overloaded chassis, Sprout splits the job across three specialised mobile bots that share the same instrumented plant bed and coordinate wirelessly over ESP-NOW:</p>
+            <ul>
+                <li><strong>1. Water Bot</strong> — carries the water reservoir and a solenoid valve. It reads each plant's capacitive soil-moisture value and dispenses a precisely calibrated amount of water (1–6 doses of 2&nbsp;ml) based on that plant's soil profile. Watering is the most frequent task, so this bot is optimised purely for line-following and metered dispensing.</li>
+                <li><strong>2. Compost / NPK Bot</strong> — carries the compost payload and a servo-driven flap, plus an NPK sensor on a rack-and-pinion arm that lowers into the soil. It measures soil nitrogen, phosphorus, and potassium, and dispenses fertiliser accordingly (twice for nutrient-poor soil, once for healthy soil). This is a chemistry/nutrition task on a completely different timescale from watering, with its own heavy payload — so it can't share the water bot's mechanism.</li>
+                <li><strong>3. Raspberry Pi Camera Bot</strong> — carries a Raspberry Pi and camera. It captures plant images on demand and serves them through a Flask web server with an AI plant-identification and health-description feature, letting a greenhouse operator or home gardener check in remotely. This is a compute/vision task needing a full Linux SBC, not the lightweight microcontrollers the other two bots use.</li>
+            </ul>
+            <p>Separating the roles keeps each bot mechanically simple, lets them run their tasks independently and in parallel, and means a fault in one (say, the camera) never takes watering or fertilising offline. The Arduino/ESP32 network ties them together so the whole fleet behaves as one autonomous system.</p>
+
+            <h2>System Architecture</h2>
+            <p>The system consists of a 3×2 plant matrix embedded with capacitive soil moisture sensors, two autonomous mobile bots, and a Raspberry Pi camera module. The control stack is distributed across three layers:</p>
+            <ul>
+                <li><strong>Arduino UNO</strong> — reads all analog soil moisture sensors and transmits data serially.</li>
+                <li><strong>ESP32 modules</strong> — handle path logic and inter-device communication via ESP-NOW protocol (peer-to-peer Wi-Fi without a router).</li>
+                <li><strong>Raspberry Pi</strong> — runs a Flask web server with AI integration for plant identification and health reporting.</li>
+            </ul>
+            <div class="media-stack">
+                <figure>
+                    <img src="graphs/circuit_schematic.png" alt="Full circuit schematic: ESP32 to Arduino, Arduino UNO, ESP32-on-bot, five soil sensors with resistor divider, NPK sensor, relay, and servos.">
+                    <figcaption>Full circuit schematic — ESP32 (to Arduino) · Arduino UNO R3 · ESP32-on-bot · five capacitive soil sensors through a 1&nbsp;kΩ/2&nbsp;kΩ divider · NPK sensor (DATA/VCC/GND) · relay (NC/NO) · drive servos.</figcaption>
+                </figure>
+                <figure>
+                    <img src="graphs/system_block_diagram.png" alt="Block diagram: NPK sensor to Arduino, stored in an indexed array, forwarded via ESP32_one over ESP-NOW to ESP32_two driving the fertiliser dispenser.">
+                    <figcaption>System block diagram — sensing chain (NPK/soil → Arduino → ESP32_one) and the ESP-NOW link to ESP32_two on the bot that drives the dispenser; IR handles line-following.</figcaption>
+                </figure>
+                <figure>
+                    <img src="graphs/electrical_flow.png" alt="Electrical system flow: soil sensor measurements sent to the ESP, which calculates the water dispensing amount.">
+                    <figcaption>Electrical-system flow: soil-sensor measurements → ESP → computed water-dispensing amount.</figcaption>
+                </figure>
+                <figure>
+                    <img src="graphs/code_espnow_struct.png" alt="ESP-NOW firmware: receiver MAC address, a message struct carrying five moisture floats, and the send-status callback.">
+                    <figcaption>ESP-NOW peer-to-peer link — the five per-plant moisture values are packed into a struct and pushed between ESP32s by MAC address, no Wi-Fi router involved.</figcaption>
+                </figure>
+            </div>
+
+            <h2>Water Bot</h2>
+            <p>Each plant is equipped with a capacitive soil moisture sensor that outputs a voltage proportional to soil water content (dry soil: ~3.3V; saturated soil: ~1.03V). The Arduino reads all five sensors, converts raw ADC values to voltages using <code>values[i] = (float(raw) / 1023.0) * 3.3</code>, and sends this data to ESP-1 via serial communication. ESP-1 relays the data over ESP-NOW to ESP-2 on the water bot.</p>
+            <p>The water bot follows an IR line-following track and uses an IR proximity sensor to detect and stop at each plant. Based on the received moisture voltage, it determines how many times to actuate a solenoid valve (2 ml per dispense), dispensing between 1 and 6 times depending on dryness. Two soil profiles were characterised through gravimetric and volumetric analysis to calibrate the watering logic per soil type.</p>
+            <div class="media-stack">
+                <figure>
+                    <img src="graphs/soil_sensor_reading.jpg" alt="Capacitive soil sensor probing a 3D-printed pot, reading 0.97 V on the Arduino serial monitor.">
+                    <figcaption>Capacitive soil sensor reading a saturated pot at ~0.97&nbsp;V — the raw ADC is converted to volts with <code>(raw/1023)·3.3</code>.</figcaption>
+                </figure>
+                <figure>
+                    <img src="graphs/water_dispense_calibration.jpg" alt="Four pots labelled with dispense counts and voltages: 1× at 3.17 V, 5× at 2.66 V, 7× at 1.26 V, 8× at 1.07 V.">
+                    <figcaption>Calibrating dispense count to soil-moisture voltage: drier soil (higher V) gets fewer 2&nbsp;ml doses — 1× at 3.17&nbsp;V up to 8× at 1.07&nbsp;V.</figcaption>
+                </figure>
+                <figure>
+                    <img src="graphs/soil_profiles_side_by_side.jpg" alt="Two soil profiles' pots side by side with dispense-count and voltage sticky notes for gravimetric calibration.">
+                    <figcaption>Two soil profiles characterised side by side via gravimetric/volumetric analysis, each with its own moisture-to-water mapping.</figcaption>
+                </figure>
+                <figure>
+                    <img src="graphs/code_ir_line_following.png" alt="Arduino loop reading left/right IR line sensors and an object sensor, driving servos and dispensing water per plant counter.">
+                    <figcaption>IR line-following + object-detection loop: the bot drives along the track, stops when a plant is detected, selects that plant's moisture value, and dispenses.</figcaption>
+                </figure>
+            </div>
+
+            <h2>NPK (Compost) Bot</h2>
+            <p>A second autonomous bot carries an NPK sensor (RS-485 Modbus RTU protocol, connected to an ESP32 via RE/DE-controlled RS-485 converter) to measure nitrogen, phosphorus, and potassium in the soil. The bot navigates the plant grid autonomously using IR line-following and IR object detection. Upon reaching each plant, a servo-controlled arm lowers the NPK sensor into the soil, takes a reading, and transmits it back to the Arduino via ESP-NOW through ESP-3 → ESP-1 → Arduino. Based on NPK readings, the servo-actuated compost flap dispenses fertiliser — twice for nutrient-poor soil, once for healthier soil — demonstrating closed-loop sensor-actuator control.</p>
+
+            <h2>Camera &amp; AI Module</h2>
+            <p>A third bot equipped with a Raspberry Pi camera captures images of plants on demand. These images are served through a Flask web server, allowing plant owners to remotely check in on plant health. An AI description feature provides users with information about the plant species and growing conditions, useful both for commercial greenhouse operators and home garden enthusiasts.</p>
+
+            <h2>Key Results</h2>
+            <ul>
+                <li>Soil moisture sensor voltages mapped to water dispense counts: 8× at 1.03V, 7× at 1.26V, 6× at 1.70V, 5× at 2.66V.</li>
+                <li>NPK readings for two soil profiles: Profile 1 (N: 150, P: 155, K: 145 mg/ml) and Profile 2 (N: 45, P: 70, K: 60 mg/ml).</li>
+                <li>Autonomous multi-bot coordination demonstrated on a physical track with no manual intervention.</li>
+                <li>Project cost: ~$136.72 (class kit components); full individual component cost: ~$387.</li>
+            </ul>
+
+            <h2>Lessons Learned</h2>
+            <ul>
+                <li>Gained hands-on experience with UART, serial, and Wi-Fi (ESP-NOW) communication protocols.</li>
+                <li>Implemented RS-485 Modbus RTU for NPK sensor integration with ESP32.</li>
+                <li>Developed soil profiles using gravimetric water content analysis to calibrate moisture-to-watering logic.</li>
+                <li>Used Flask to bridge embedded hardware with a web interface for real-time remote control.</li>
+                <li>Engineered robust multi-bot path planning and plant-counter synchronisation across independent systems.</li>
+            </ul>
+        </section>
+    </main>
+    <footer>
+        <p>&copy; 2026 <span class="personal-name">Loading...</span>. All rights reserved.</p>
+    </footer>
+    <script src="../../script.js"></script>
+</body>
+</html>

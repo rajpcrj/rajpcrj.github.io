@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Breez – BiPAP Non-Invasive Ventilator with Sensor Fusion &amp; BLE Telemetry</title>
+    <link rel="stylesheet" href="../../style.css">
+</head>
+<body>
+    <header>
+        <h1>Breez – BiPAP Non-Invasive Ventilator with Sensor Fusion &amp; BLE Telemetry</h1>
+    </header>
+    <main>
+        <a class="back-home" href="../../index.html">← Back to portfolio</a>
+        <section>
+            <video class="project-video" controls autoplay muted loop playsinline preload="auto">
+                <source src="breath_with_extra_co2.mp4" type="video/mp4">
+                Your browser does not support the video tag. <a href="breath_with_extra_co2.mp4">Download the video</a>.
+            </video>
+            <p><strong>Course:</strong> ROB-GY 6103: Advanced Mechatronics, NYU Tandon School of Engineering</p>
+
+            <h2>Overview</h2>
+            <p>Breez is a proof-of-concept non-invasive ventilator built on BiPAP (Bilevel Positive Airway Pressure) principles for post-COVID respiratory rehabilitation and sleep-apnea support. Air is delivered from an Ambu bag by a stepper-driven pump, while a suite of biomedical sensors reads the patient's vitals straight from the breath — a MAX30102 pulse oximeter captures heart rate and blood-oxygen (SpO₂), and a ScioSense ENS160 air-quality sensor tracks the CO₂, NO₂, and O₂ content of the exhaled air, all sharing one I²C bus alongside dual piezoresistive pressure sensors. Two Arduino UNOs split the work master/slave, and every reading streams over an RN-42 Bluetooth link to a companion Android app showing the live heart rate, SpO₂, and gas readings.</p>
+
+            <h2>Demonstration Video</h2>
+            <div class="media-stack">
+                <figure>
+                    <video controls muted loop playsinline preload="metadata">
+                        <source src="breath_with_extra_co2.mp4" type="video/mp4">
+                    </video>
+                    <figcaption>Breathing with elevated CO₂ — the ENS160 registers the rise, showing the exhalation/CO₂ correlation the control logic depends on.</figcaption>
+                </figure>
+            </div>
+
+            <h2>Technologies Used</h2>
+            <ul>
+                <li><strong>I²C (Inter-Integrated Circuit)</strong> — shared two-wire bus (SDA/SCL) carrying the MAX30102, ENS160, and pressure sensors to the master Arduino.</li>
+                <li><strong>SPI (Serial Peripheral Interface)</strong> — high-speed synchronous bus used for the display/peripheral link.</li>
+                <li><strong>UART / SoftwareSerial</strong> — serial link between the two Arduino UNOs and out to the Bluetooth module for telemetry.</li>
+                <li><strong>RN-42 Bluetooth module</strong> — wireless link streaming SpO₂, CO₂, and heart-rate data to the Android companion app.</li>
+                <li><strong>Master / Slave Arduino UNO architecture</strong> — one UNO handles sensor fusion, the other drives the stepper pump, coordinated over serial.</li>
+                <li><strong>MAX30102</strong> — integrated pulse-oximeter and heart-rate sensor (red/IR photoplethysmography) on I²C.</li>
+                <li><strong>ScioSense ENS160</strong> — metal-oxide air-quality sensor reporting eCO₂ / TVOC on I²C.</li>
+                <li><strong>Dual piezoresistive pressure sensors + HX711</strong> — nasal/airway pressure measured through a 24-bit HX711 ADC.</li>
+                <li><strong>A4988 stepper driver + stepper motor</strong> — microstepped actuation of the Ambu-bag compression mechanism.</li>
+                <li><strong>Arduino / C++ firmware</strong> — closed-loop control tying sensor readings to pump speed.</li>
+                <li><strong>Android (Java) BLE app</strong> — real-time telemetry dashboard and status display.</li>
+            </ul>
+
+            <h2>System Design &amp; Diagrams</h2>
+            <div class="media-stack">
+                <figure>
+                    <img src="graphs/diagram_conceptual_solution.png" alt="Conceptual solution flowchart for the Breez ventilator.">
+                    <figcaption>Conceptual solution — the sensing-to-actuation flow the ventilator is built around.</figcaption>
+                </figure>
+                <figure>
+                    <img src="graphs/diagram_our_solution_block.png" alt="Block diagram of the Breez solution.">
+                    <figcaption>Our solution as a block diagram — sensors, the two Arduinos, the stepper pump, and the BLE telemetry link.</figcaption>
+                </figure>
+                <figure>
+                    <img src="graphs/diagram_bipap_airflow.png" alt="BiPAP airflow diagram.">
+                    <figcaption>BiPAP airflow — bilevel positive airway pressure delivered from the Ambu bag through the mask.</figcaption>
+                </figure>
+                <figure>
+                    <img src="graphs/diagram_electrical_system.png" alt="Electrical system diagram.">
+                    <figcaption>Electrical system — the I²C sensor bus, HX711 pressure front-end, stepper driver, and Bluetooth module wired to the Arduinos.</figcaption>
+                </figure>
+                <figure>
+                    <img src="graphs/diagram_mechanical_system.png" alt="Mechanical system diagram.">
+                    <figcaption>Mechanical system — the geared stepper-driven mechanism that compresses the Ambu bag. <strong>Note:</strong> the motors turned out to be too weak to press the balloon, so we had to compress it by hand for the system to work.</figcaption>
+                </figure>
+            </div>
+
+            <h2>Sensors Used</h2>
+            <div class="media-stack">
+                <figure>
+                    <img src="graphs/max30102.webp" alt="MAX30102 pulse oximeter and heart-rate sensor.">
+                    <figcaption>MAX30102 — integrated pulse-oximeter (SpO₂) and heart-rate sensor on the I²C bus.</figcaption>
+                </figure>
+                <figure>
+                    <img src="graphs/ens160.jpg" alt="ScioSense ENS160 air-quality / CO2 sensor.">
+                    <figcaption>ScioSense ENS160 — metal-oxide eCO₂ / air-quality sensor used to track exhaled CO₂.</figcaption>
+                </figure>
+                <figure>
+                    <img src="graphs/pressure_sesnosr_and_hx7111.jpeg" alt="Piezoresistive pressure sensor with HX711 24-bit ADC.">
+                    <figcaption>Piezoresistive pressure sensor with the HX711 24-bit ADC front-end for nasal/airway pressure.</figcaption>
+                </figure>
+                <figure>
+                    <img src="graphs/rn42_bluetooth_module.jpg" alt="The RN-42 Bluetooth module board.">
+                    <figcaption>RN-42 Bluetooth module — the GND/VIN/RST/RX/TX/RTS/CTS link used for wireless telemetry.</figcaption>
+                </figure>
+            </div>
+
+            <h2>Companion Android App</h2>
+            <div class="media-stack">
+                <figure>
+                    <img src="graphs/app_screenshot_1.jpg" alt="Android app screen: Scan For Bluetooth Ventilator and status.">
+                    <figcaption>The companion app scanning for and connecting to the Bluetooth ventilator.</figcaption>
+                </figure>
+                <figure>
+                    <img src="graphs/app_screenshot_2.jpg" alt="Android app screen showing live CO2, SpO2 and BPM telemetry.">
+                    <figcaption>Live telemetry — CO₂, SpO₂, and heart rate streamed over Bluetooth from the device.</figcaption>
+                </figure>
+            </div>
+
+            <h2>Mechanism &amp; Telemetry</h2>
+            <div class="media-stack">
+                <figure>
+                    <img src="graphs/cad_pump_mechanism.jpg" alt="CAD render of the geared Ambu-bag compression mechanism.">
+                    <figcaption>CAD design of the stepper-driven Ambu-bag compression mechanism.</figcaption>
+                </figure>
+                <figure>
+                    <img src="graphs/pump_mechanism_build.jpg" alt="The physical 3D-printed geared pump mechanism with stepper motor.">
+                    <figcaption>The 3D-printed mechanism built and mounted — stepper motor, gear train, and compression arms.</figcaption>
+                </figure>
+                <figure>
+                    <img src="graphs/serial_telemetry.jpg" alt="Arduino serial monitor showing live CO2, IR, temperature, humidity, BPM, and nasal pressure.">
+                    <figcaption>Live serial-monitor telemetry: CO₂ (ppm), IR value, temperature, humidity, BPM, and nasal pressure each cycle.</figcaption>
+                </figure>
+                <figure>
+                    <img src="graphs/live_ble_plotter_code.png" alt="Live serial plotter graphing a sensor waveform next to the Arduino code.">
+                    <figcaption>Live BLE data plotted in real time alongside the heart-rate averaging code.</figcaption>
+                </figure>
+            </div>
+
+            <h2>Outcome &amp; Lesson Learned</h2>
+            <p><strong>What we learned:</strong> On testing the assembled mechanism, we realized the motors were not strong enough to compress the Ambu bag (balloon) hard enough to drive adequate airflow. The sensing, fusion, and BLE telemetry pipeline all worked end-to-end, but the actuation stage needs a higher-torque motor (or a mechanical-advantage redesign of the gear train) to deliver clinically useful pressure — the key takeaway for the next iteration.</p>
+        </section>
+    </main>
+    <footer>
+        <p>&copy; 2026 <span class="personal-name">Loading...</span>. All rights reserved.</p>
+    </footer>
+    <script src="../../script.js"></script>
+</body>
+</html>

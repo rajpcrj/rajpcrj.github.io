@@ -32,20 +32,20 @@
         <section id="projects">
             <h2>My Projects</h2>
             <div class="projects">
-                <div class="project">
-                    <a href="projects/project1/index.html">
-                        <video src="projects/project1/demo.mp4" autoplay muted loop playsinline></video>
+                <div class="project" data-id="home_safety_fall_detection_smart_stove_control">
+                    <a href="projects/home_safety_fall_detection_smart_stove_control/index.html">
+                        <video src="projects/home_safety_fall_detection_smart_stove_control/demo.mp4" autoplay muted loop playsinline></video>
                         <h3>Home Safety System – Fall Detection &amp; Smart Stove Control</h3>
                     </a>
-                    <p>A wearable safety system designed to protect elderly individuals living alone. Using a dual-axis accelerometer and two BS2 microcontrollers communicating over Bluetooth, the device detects falls in real time and triggers a 30-second cancel window before taking action. If no cancellation is received, it automatically texts the user's GPS location to a pre-set emergency contact and simultaneously shuts off the electric stove via a Solid State Relay — preventing hazards the user may be unable to address themselves. The system also includes a soft-reset button, a kill switch, a buzzer, and an LED for user feedback. Prototype cost was ~$404; mass production cost analysis brought this down to ~$96.54 with component substitutions and bulk ordering.</p>
+                    <p>A wearable safety system that protects elderly individuals living alone, built for the Mechatronics course at NYU Tandon. A pocket-worn unit reads a Memsic 2125 dual-axis accelerometer through pulse-width sampling on a BASIC Stamp 2 microcontroller, detecting falls as calibrated deviations from a per-session baseline. On detection it opens a 30-second cancel window (20 s silent + 10 s buzzer warning); if not cancelled, it commands the user's phone over an RN-42 Bluetooth link to text GPS coordinates and a street address to an emergency contact, while a second BS2 — wired into a rewired 15 A electric stovetop through a Solid State Relay — cuts power to the stove. Includes a soft-reset button, a hardware kill switch, and status LEDs; a full bill-of-materials analysis showed the ~$404 prototype dropping below $100 at production scale.</p>
                     <div class="project-links">
                         <a href="#" target="_blank">&lt;/&gt; Code</a>
                         <a href="#" target="_blank">📄 Report</a>
                     </div>
                 </div>
-                <div class="project">
-                    <a href="projects/project3/index.html">
-                        <video src="projects/project3/demo.mp4" autoplay muted loop playsinline></video>
+                <div class="project" data-id="sprout">
+                    <a href="projects/sprout/index.html">
+                        <video src="projects/sprout/rpi_bot.mp4" autoplay muted loop playsinline></video>
                         <h3>Sprout – Autonomous Greenhouse Plant Care System</h3>
                     </a>
                     <p>Sprout is an autonomous mechatronic system developed for ROB-GY 6103: Advanced Mechatronics at NYU Tandon School of Engineering. It automates the care of greenhouse plants through a multi-bot architecture driven by real-time soil sensor data. A water bot navigates a 3×2 plant grid using IR line-following, reads soil moisture via capacitive sensors connected to an Arduino, and dispenses precise amounts of water through a solenoid valve based on soil profiles built from gravimetric analysis. A second NPK bot autonomously measures nitrogen, phosphorus, and potassium levels using an RS-485 Modbus sensor, then dispenses compost via a servo-actuated mechanism. A Raspberry Pi camera bot captures plant images served through a Flask web server with AI-based plant identification. Inter-device communication is handled via ESP-NOW protocol between ESP32 modules, enabling fully wireless, autonomous coordination across all three bots with no manual intervention.</p>
@@ -54,9 +54,20 @@
                         <a href="#" target="_blank">📄 Report</a>
                     </div>
                 </div>
-                <div class="project">
+                <div class="project" data-id="breez_bipap_ventilator">
+                    <a href="projects/breez_bipap_ventilator/index.html">
+                        <video src="projects/breez_bipap_ventilator/breath_with_extra_co2.mp4" autoplay muted loop playsinline></video>
+                        <h3>Breez – BiPAP Non-Invasive Ventilator with Sensor Fusion &amp; BLE Telemetry</h3>
+                    </a>
+                    <p>A proof-of-concept non-invasive ventilator built on BiPAP (Bilevel Positive Airway Pressure) principles for post-COVID respiratory rehabilitation and sleep-apnea support, developed for the Advanced Mechatronics course at NYU Tandon. Air is delivered from an Ambu bag by a stepper-driven pump whose speed is set in a real-time closed loop from fused biomedical sensing: a MAX30102 pulse oximeter (SpO₂ + heart rate via red/IR photoplethysmography), a ScioSense ENS160 metal-oxide CO₂/air-quality sensor, and dual piezoresistive pressure sensors in the mask and Ambu bag — all sharing one I²C bus with per-device addressing. Two Arduino UNOs split the work master/slave over I²C: the master evaluates physiological thresholds (heart rate, CO₂, pressure) and flags the slave, which drives the pump through an A4988 stepper driver. Every reading streams over an RN-42/HM-10 Bluetooth Low Energy link to a companion Android app showing live SpO₂, CO₂, and BPM — turning the device into a telemedical, remotely-monitored ventilator.</p>
+                    <div class="project-links">
+                        <a href="#" target="_blank">&lt;/&gt; Code</a>
+                        <a href="projects/breez_bipap_ventilator/index.html">📖 Project Explanation</a>
+                    </div>
+                </div>
+                <div class="project" data-id="go2">
                     <a href="projects/go2/index.html">
-                        <video src="projects/go2/demo.mp4" autoplay muted loop playsinline></video>
+                        <video src="projects/go2/run_133736_randomized.mp4" autoplay muted loop playsinline></video>
                         <h3>Go2 RL Locomotion – Training a Unitree Quadruped to Walk in Isaac Lab</h3>
                     </a>
                     <p>A deep reinforcement learning project (ROB-GY 6323, NYU) that trains a Unitree Go2 quadruped to walk inside NVIDIA Isaac Lab. Using PPO across thousands of GPU-parallel environments on NYU's Greene HPC cluster, the policy is shaped through principled reward terms — velocity tracking, posture stabilization, foot clearance, slip minimization, and smooth actions — and made robust through domain randomization with randomized masses, friction, and external push disturbances for sim-to-real transfer. The full pipeline runs on SLURM, producing TensorBoard metrics, model checkpoints, and rollout videos of the trained gait.</p>
@@ -65,7 +76,7 @@
                         <a href="#" target="_blank">📄 Report</a>
                     </div>
                 </div>
-                <div class="project">
+                <div class="project" data-id="shm_fanout">
                     <a href="projects/shm_fanout/index.html">
                         <img src="projects/shm_fanout/graphs/cpu_vs_subs_1m.png" alt="ros2_shm_fanout – CPU vs subscribers benchmark">
                         <h3>ros2_shm_fanout – A Shared-Memory Transport for High-Fan-Out Perception</h3>
@@ -74,6 +85,16 @@
                     <div class="project-links">
                         <a href="https://github.com/rajpcrj/ros2_shm_fanout" target="_blank">&lt;/&gt; Code</a>
                         <a href="projects/shm_fanout/index.html">📖 Project Explanation</a>
+                    </div>
+                </div>
+                <div class="project" data-id="space_robotics">
+                    <a href="projects/space_robotics/index.html">
+                        <img src="projects/space_robotics/graphs/routing_isaac_sim.png" alt="Satellite constellation in NVIDIA Isaac Sim — green power beams converging onto rectenna regions on the Earth sphere">
+                        <h3>Satellite Constellation Design for Space-Based Wireless Power Transfer</h3>
+                    </a>
+                    <p>A complete constellation-design pipeline that answers a concrete question: where do you place ground stations, which orbits do you fly, and what is the fewest satellites that keeps every station powered? Built for ROB-GY 7863 (Space Robotics, NYU), it places 50 ground rectennas by running an Earth land/ocean map through K-Means + Voronoi segmentation, propagates a grid of candidate orbits and computes satellite-to-rectenna visibility fully vectorized on the GPU (PyTorch/CUDA) across a (1183 × 50 × time) tensor, then selects the minimum constellation with a mixed-integer linear program (PuLP/CBC) under per-station coverage constraints — with an independent verifier re-checking every constraint. Underneath sits a from-scratch 12-DOF rigid-body spacecraft model in dual Newton–Euler and Lagrangian formulations, cross-validated against MuJoCo. The whole system is visualized in NVIDIA Isaac Sim with animated multi-hop power beams.</p>
+                    <div class="project-links">
+                        <a href="projects/space_robotics/index.html">📖 Project Explanation</a>
                     </div>
                 </div>
             </div>
